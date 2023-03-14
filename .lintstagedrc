@@ -1,0 +1,5 @@
+{
+  "*": [
+    "prettier --check --config ./.prettierrc.yaml"
+  ]
+}
