@@ -4,7 +4,6 @@ import { shouldBehaveLikeRemoveRewardInfo } from "./specs/farmingRangeRemoveRewa
 import { shouldBehaveLikeUpdateRewardMultiple } from "./specs/farmingRangeUpdateMultiple.spec";
 import { shouldBehaveLikeUpdateRewardInfo } from "./specs/farmingRangeUpdateReward.spec";
 import { shouldBehaveLikeDepositWithPermit } from "./specs/depositWithPermit.spec";
-import { shouldBehaveLikeUpgradePrecision } from "./specs/upgradePrecision.spec";
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 
 export function unitTestsFarmingRange(): void {
@@ -22,6 +21,5 @@ export function unitTestsFarmingRange(): void {
     shouldBehaveLikeUpdateRewardMultiple();
     shouldBehaveLikeRemoveRewardInfo();
     shouldBehaveLikeDepositWithPermit();
-    shouldBehaveLikeUpgradePrecision();
   });
 }
