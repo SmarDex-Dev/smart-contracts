@@ -44,7 +44,7 @@ import {
   deployWETH9,
 } from "./deployers";
 import { parseEther } from "ethers/lib/utils";
-import { latestBlockNumber, advanceBlockTo } from "./helpers/time";
+import { advanceBlockTo, latestBlockNumber } from "./helpers/time";
 import { IFarming } from "./types";
 import { ethers } from "hardhat";
 
@@ -227,8 +227,8 @@ export async function unitFixtureFarmingRange(): Promise<UnitFixtureFarmingRange
   const [deployer, alice, bob, cat] = signers;
 
   const stakingToken = await deployERC20Test(constants.Zero);
-  const rewardToken2 = await deploySmardexToken("ERC20reward2", "RWD2", 0);
-  const rewardToken = await deploySmardexToken("ERC20reward", "RWD", 0);
+  const rewardToken2 = await deploySmardexToken("ERC20reward2", "RWD2", constants.Zero);
+  const rewardToken = await deploySmardexToken("ERC20reward", "RWD", constants.Zero);
   const farmingRange = await deployFarmingRange(deployer);
   const rewardTokenAsDeployer = rewardToken.connect(deployer);
   const rewardToken2AsDeployer = rewardToken2.connect(deployer);
@@ -295,7 +295,7 @@ export async function unitFixtureCampaignWith2rewards(
 }
 
 type UnitFixtureStaking = {
-  smardexToken: ERC20Permit;
+  smardexTokenTest: SmardexTokenTest;
   staking: Staking;
   farming: FarmingRange;
   startBlockFarming: BigNumber;
@@ -305,13 +305,17 @@ type UnitFixtureStaking = {
 export async function unitFixtureStaking(): Promise<UnitFixtureStaking> {
   const signers = await ethers.getSigners();
   const deployer = signers[0];
-  const smardexToken: ERC20Permit = await deployERC20Test(parseEther("10000"));
+  const smardexTokenTest: SmardexTokenTest = await deploySmardexToken(
+    "Smardex Token Test",
+    "SDEX",
+    parseEther("10000"),
+  );
   const farming = await deployFarmingRange(deployer);
-  const staking: Staking = await deployStaking(smardexToken.address, farming.address);
-  const checkBlockTest: CheckBlockTest = await deployCheckBlockTest(staking.address, smardexToken.address);
+  const staking: Staking = await deployStaking(smardexTokenTest.address, farming.address);
+  const checkBlockTest: CheckBlockTest = await deployCheckBlockTest(staking.address, smardexTokenTest.address);
 
-  await smardexToken.approve(staking.address, constants.MaxUint256);
-  await smardexToken.approve(farming.address, constants.MaxUint256);
+  await smardexTokenTest.approve(staking.address, constants.MaxUint256);
+  await smardexTokenTest.approve(farming.address, constants.MaxUint256);
 
   //total campaign cost : 21 SDEX
   //1st: block 8 - 10 : 1 SDEX * 3
@@ -323,11 +327,11 @@ export async function unitFixtureStaking(): Promise<UnitFixtureStaking> {
     parseEther("2"),
     farming,
     staking.address,
-    smardexToken.address,
+    smardexTokenTest.address,
   );
 
   return {
-    smardexToken,
+    smardexTokenTest,
     staking,
     farming,
     startBlockFarming,

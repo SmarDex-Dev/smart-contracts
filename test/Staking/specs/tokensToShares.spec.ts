@@ -15,7 +15,7 @@ export function shouldBehaveLikeTokensToShares(): void {
     expect(await this.contracts.staking.tokensToShares(parseEther("10"))).to.be.eq(parseShare(parseEther("10")));
 
     // tokens * 10 shares  / 20 SDEX
-    await this.contracts.smardexToken.transfer(this.contracts.staking.address, parseEther("10"));
+    await this.contracts.smardexTokenTest.transfer(this.contracts.staking.address, parseEther("10"));
     expect(await this.contracts.staking.tokensToShares(parseEther("1"))).to.be.eq(parseShare(parseEther("0.5")));
     expect(await this.contracts.staking.tokensToShares(parseEther("2"))).to.be.eq(parseShare(parseEther("1")));
 

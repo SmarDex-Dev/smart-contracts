@@ -22,8 +22,8 @@ export function unitTestsStaking(): void {
 
       this.misc.startBlock = fixture.startBlockFarming;
 
-      await this.contracts.smardexToken.transfer(this.signers.user.address, SMARDEX_USER_BALANCE);
-      await this.contracts.smardexToken
+      await this.contracts.smardexTokenTest.transfer(this.signers.user.address, SMARDEX_USER_BALANCE);
+      await this.contracts.smardexTokenTest
         .connect(this.signers.user)
         .approve(this.contracts.staking.address, constants.MaxUint256);
     });
