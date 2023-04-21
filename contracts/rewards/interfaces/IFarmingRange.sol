@@ -130,6 +130,11 @@ interface IFarmingRange {
     event SetRewardManager(address rewardManager);
 
     /**
+     * @notice increase precision of accRewardPerShare in all campaign
+     */
+    function upgradePrecision() external;
+
+    /**
      * @notice set the reward manager, responsible for adding rewards
      * @param _rewardManager address of the reward manager
      */

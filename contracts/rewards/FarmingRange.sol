@@ -36,6 +36,14 @@ contract FarmingRange is IFarmingRange, Ownable, ReentrancyGuard {
     }
 
     /// @inheritdoc IFarmingRange
+    function upgradePrecision() external onlyOwner {
+        uint256 _length = campaignInfo.length;
+        for (uint256 _pid = 0; _pid < _length; ++_pid) {
+            campaignInfo[_pid].accRewardPerShare = campaignInfo[_pid].accRewardPerShare * 1e8;
+        }
+    }
+
+    /// @inheritdoc IFarmingRange
     function setRewardManager(address _rewardManager) external onlyOwner {
         rewardManager = _rewardManager;
         emit SetRewardManager(_rewardManager);
