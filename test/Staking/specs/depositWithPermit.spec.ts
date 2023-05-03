@@ -4,7 +4,7 @@ import { parseEther } from "ethers/lib/utils";
 import { getPermitSignature } from "../../utils";
 import { expect } from "chai";
 import { constants } from "ethers";
-import { parseShare } from "../utils";
+import { MINIMUM_SHARES, parseShare } from "../utils";
 
 export function shouldBehaveLikeDepositWithPermit(): void {
   let user: SignerWithAddress;
@@ -15,11 +15,11 @@ export function shouldBehaveLikeDepositWithPermit(): void {
 
   beforeEach(async function () {
     ({ user } = this.signers);
-    ({ staking, smardexToken: sdex } = this.contracts);
+    ({ staking, smardexTokenTest: sdex } = this.contracts);
 
     await staking.initializeFarming();
 
-    await this.contracts.smardexToken.connect(this.signers.user).approve(this.contracts.staking.address, 0);
+    await this.contracts.smardexTokenTest.connect(this.signers.user).approve(this.contracts.staking.address, 0);
   });
 
   it("should deposit with permit", async function () {
@@ -29,7 +29,7 @@ export function shouldBehaveLikeDepositWithPermit(): void {
     await staking.connect(user).depositWithPermit(permitAmount, false, constants.MaxUint256, v, r, s);
 
     expect(await sdex.allowance(user.address, staking.address)).to.be.eq(0);
-    expect((await staking.userInfo(user.address)).shares).to.be.eq(parseShare(permitAmount));
+    expect((await staking.userInfo(user.address)).shares).to.be.eq(parseShare(permitAmount).sub(MINIMUM_SHARES));
   });
 
   it("should revert when not the same user", async function () {

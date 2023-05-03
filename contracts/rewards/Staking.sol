@@ -17,6 +17,7 @@ contract Staking is IStaking, ERC20 {
 
     uint256 public constant CAMPAIGN_ID = 0;
     uint256 internal constant SHARES_FACTOR = 1e18;
+    uint256 public constant MINIMUM_SHARES = 10 ** 3;
 
     IERC20 public immutable smardexToken;
     IFarmingRange public immutable farming;
@@ -65,10 +66,17 @@ contract Staking is IStaking, ERC20 {
 
         smardexToken.safeTransferFrom(msg.sender, address(this), _depositAmount);
 
+        uint256 _userNewShares;
+        if (totalShares == 0) {
+            _userNewShares = _newShares - MINIMUM_SHARES;
+        } else {
+            _userNewShares = _newShares;
+        }
+        require(_userNewShares > 0, "Staking::deposit::no new shares received");
+        userInfo[msg.sender].shares += _userNewShares;
         totalShares += _newShares;
-        userInfo[msg.sender].shares += _newShares;
 
-        emit Deposit(msg.sender, _depositAmount, _newShares);
+        emit Deposit(msg.sender, _depositAmount, _userNewShares);
     }
 
     /// @inheritdoc IStaking

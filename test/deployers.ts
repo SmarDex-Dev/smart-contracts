@@ -2,24 +2,24 @@ import { BigNumber, Signer } from "ethers";
 import { ethers } from "hardhat";
 import {
   AutoSwapper,
-  CheckBlockTest,
   CallbackTest,
+  CheckBlockTest,
   DoubleSwapRouter,
   ERC20Test,
   FarmingRange,
   RewardManager,
   RouterEventEmitter,
+  RouterForPairTest,
   SmardexFactory,
   SmardexFactoryTest,
   SmardexLibraryTest,
   SmardexPair,
   SmardexPairTest,
   SmardexRouter,
+  SmardexRouterTest,
   SmardexTokenTest,
   Staking,
   WETH9,
-  SmardexRouterTest,
-  RouterForPairTest,
 } from "../typechain";
 
 export async function deployOrderedPairOfERC20(totalSupply: BigNumber): Promise<[ERC20Test, ERC20Test]> {
@@ -121,7 +121,7 @@ export async function deployRouterEventEmitter(): Promise<RouterEventEmitter> {
   return routerEventEmitter;
 }
 
-export async function deploySmardexToken(name: string, symbol: string, supply: number): Promise<SmardexTokenTest> {
+export async function deploySmardexToken(name: string, symbol: string, supply: BigNumber): Promise<SmardexTokenTest> {
   const contractSmardexToken = await ethers.getContractFactory("SmardexTokenTest", {});
   const smardexToken = await contractSmardexToken.deploy(name, symbol, supply);
   await smardexToken.deployed();

@@ -17,6 +17,7 @@ import {
   SmardexPairTest,
   SmardexRouter,
   SmardexRouterTest,
+  SmardexTokenTest,
   Staking,
   WETH9,
 } from "../typechain";
@@ -36,6 +37,7 @@ export interface Contracts {
   smardexFactoryTest: SmardexFactoryTest;
   smardexLibraryTest: SmardexLibraryTest;
   smardexToken: ERC20Permit;
+  smardexTokenTest: SmardexTokenTest;
   token0: ERC20Test;
   token1: ERC20Test;
   smardexPair: SmardexPair;
