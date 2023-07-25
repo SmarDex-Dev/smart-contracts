@@ -37,15 +37,23 @@ contract SmardexLibraryTest {
         uint256 _fictiveReserveIn,
         uint256 _fictiveReserveOut,
         uint256 _priceAverageIn,
-        uint256 _priceAverageOut
+        uint256 _priceAverageOut,
+        uint128 _feesLP,
+        uint128 _feesPool
     ) external pure returns (uint256 firstAmountIn_) {
         return
             SmardexLibrary.computeFirstTradeQtyIn(
-                _amountIn,
-                _fictiveReserveIn,
-                _fictiveReserveOut,
-                _priceAverageIn,
-                _priceAverageOut
+                SmardexLibrary.GetAmountParameters({
+                    amount: _amountIn,
+                    reserveIn: 0,
+                    reserveOut: 0,
+                    fictiveReserveIn: _fictiveReserveIn,
+                    fictiveReserveOut: _fictiveReserveOut,
+                    priceAverageIn: _priceAverageIn,
+                    priceAverageOut: _priceAverageOut,
+                    feesLP: _feesLP,
+                    feesPool: _feesPool
+                })
             );
     }
 
@@ -54,15 +62,23 @@ contract SmardexLibraryTest {
         uint256 _fictiveReserveIn,
         uint256 _fictiveReserveOut,
         uint256 _priceAverageIn,
-        uint256 _priceAverageOut
+        uint256 _priceAverageOut,
+        uint128 _feesLP,
+        uint128 _feesPool
     ) external pure returns (uint256 firstAmountOut_) {
         return
             SmardexLibrary.computeFirstTradeQtyOut(
-                _amountOut,
-                _fictiveReserveIn,
-                _fictiveReserveOut,
-                _priceAverageIn,
-                _priceAverageOut
+                SmardexLibrary.GetAmountParameters({
+                    amount: _amountOut,
+                    reserveIn: 0,
+                    reserveOut: 0,
+                    fictiveReserveIn: _fictiveReserveIn,
+                    fictiveReserveOut: _fictiveReserveOut,
+                    priceAverageIn: _priceAverageIn,
+                    priceAverageOut: _priceAverageOut,
+                    feesLP: _feesLP,
+                    feesPool: _feesPool
+                })
             );
     }
 
@@ -80,7 +96,9 @@ contract SmardexLibraryTest {
         uint256 _reserveIn,
         uint256 _reserveOut,
         uint256 _fictiveReserveIn,
-        uint256 _fictiveReserveOut
+        uint256 _fictiveReserveOut,
+        uint128 _feesLP,
+        uint128 _feesPool
     )
         external
         pure
@@ -94,11 +112,17 @@ contract SmardexLibraryTest {
     {
         return
             SmardexLibrary.applyKConstRuleOut(
-                _amountIn,
-                _reserveIn,
-                _reserveOut,
-                _fictiveReserveIn,
-                _fictiveReserveOut
+                SmardexLibrary.GetAmountParameters({
+                    amount: _amountIn,
+                    reserveIn: _reserveIn,
+                    reserveOut: _reserveOut,
+                    fictiveReserveIn: _fictiveReserveIn,
+                    fictiveReserveOut: _fictiveReserveOut,
+                    priceAverageIn: 0,
+                    priceAverageOut: 0,
+                    feesLP: _feesLP,
+                    feesPool: _feesPool
+                })
             );
     }
 
@@ -107,7 +131,9 @@ contract SmardexLibraryTest {
         uint256 _reserveIn,
         uint256 _reserveOut,
         uint256 _fictiveReserveIn,
-        uint256 _fictiveReserveOut
+        uint256 _fictiveReserveOut,
+        uint128 _feesLP,
+        uint128 _feesPool
     )
         external
         pure
@@ -121,22 +147,22 @@ contract SmardexLibraryTest {
     {
         return
             SmardexLibrary.applyKConstRuleIn(
-                _amountOut,
-                _reserveIn,
-                _reserveOut,
-                _fictiveReserveIn,
-                _fictiveReserveOut
+                SmardexLibrary.GetAmountParameters({
+                    amount: _amountOut,
+                    reserveIn: _reserveIn,
+                    reserveOut: _reserveOut,
+                    fictiveReserveIn: _fictiveReserveIn,
+                    fictiveReserveOut: _fictiveReserveOut,
+                    priceAverageIn: 0,
+                    priceAverageOut: 0,
+                    feesLP: _feesLP,
+                    feesPool: _feesPool
+                })
             );
     }
 
     function getAmountOut(
-        uint256 _amountIn,
-        uint256 _reserveIn,
-        uint256 _reserveOut,
-        uint256 _fictiveReserveIn,
-        uint256 _fictiveReserveOut,
-        uint256 _priceAverageIn,
-        uint256 _priceAverageOut
+        SmardexLibrary.GetAmountParameters memory _param
     )
         external
         pure
@@ -148,26 +174,11 @@ contract SmardexLibraryTest {
             uint256 newFictiveReserveOut_
         )
     {
-        return
-            SmardexLibrary.getAmountOut(
-                _amountIn,
-                _reserveIn,
-                _reserveOut,
-                _fictiveReserveIn,
-                _fictiveReserveOut,
-                _priceAverageIn,
-                _priceAverageOut
-            );
+        return SmardexLibrary.getAmountOut(_param);
     }
 
     function getAmountIn(
-        uint256 _amountOut,
-        uint256 _reserveIn,
-        uint256 _reserveOut,
-        uint256 _fictiveReserveIn,
-        uint256 _fictiveReserveOut,
-        uint256 _priceAverageIn,
-        uint256 _priceAverageOut
+        SmardexLibrary.GetAmountParameters memory _param
     )
         external
         pure
@@ -179,15 +190,6 @@ contract SmardexLibraryTest {
             uint256 newFictiveReserveOut_
         )
     {
-        return
-            SmardexLibrary.getAmountIn(
-                _amountOut,
-                _reserveIn,
-                _reserveOut,
-                _fictiveReserveIn,
-                _fictiveReserveOut,
-                _priceAverageIn,
-                _priceAverageOut
-            );
+        return SmardexLibrary.getAmountIn(_param);
     }
 }

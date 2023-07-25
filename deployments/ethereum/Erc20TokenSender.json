@@ -1,0 +1,33 @@
+{
+  "address": "0x578c4074BBcE3E2c57D87FB02EDc4EE1f383D94a",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_token",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "_to",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "_ratioUp",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "_ratioDown",
+          "type": "uint256"
+        }
+      ],
+      "name": "sendMyTokenTo",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    }
+  ]
+}

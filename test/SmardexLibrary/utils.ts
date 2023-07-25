@@ -1,20 +1,7 @@
 import { BigNumber } from "ethers";
 import { parseEther } from "ethers/lib/utils";
-
-const ONE = BigNumber.from(1);
-const TWO = BigNumber.from(2);
-
-export function sqrt(value: BigNumber) {
-  const x = BigNumber.from(value);
-  let z = x.add(ONE).div(TWO);
-  let y = x;
-  while (z.sub(y).isNegative()) {
-    y = z;
-    z = x.div(z).add(z).div(TWO);
-  }
-  return y;
-}
-
+import { expect } from "chai";
+import { FEES_LP, FEES_POOL } from "../constants";
 export interface GetAmountTrade {
   reserveToken0: BigNumber;
   reserveToken1: BigNumber;
@@ -28,6 +15,18 @@ export interface GetAmountTrade {
   expectedReserveToken1: BigNumber;
   expectedFictiveReserveToken0: BigNumber;
   expectedFictiveReserveToken1: BigNumber;
+}
+
+export interface GetAmountParametersStruct {
+  amount: BigNumber;
+  reserveIn: BigNumber;
+  reserveOut: BigNumber;
+  fictiveReserveIn: BigNumber;
+  fictiveReserveOut: BigNumber;
+  priceAverageIn: BigNumber;
+  priceAverageOut: BigNumber;
+  feesLP: BigNumber;
+  feesPool: BigNumber;
 }
 
 export const getAmountSimpleTestData: GetAmountTrade[] = [
@@ -179,3 +178,129 @@ export const getAmount2TradesTestData: GetAmountTrade[] = [
     expectedFictiveReserveToken0: parseEther("8.094353523617659658"),
   },
 ];
+
+// getAmountIn params arrays side: -1
+const argsIn: BigNumber[][] = [
+  [
+    BigNumber.from("1"),
+    BigNumber.from("0"),
+    BigNumber.from("100"),
+    BigNumber.from("0"),
+    BigNumber.from("50"),
+    BigNumber.from("1"),
+    BigNumber.from("1"),
+    FEES_LP,
+    FEES_POOL,
+  ],
+  [
+    BigNumber.from("1"),
+    BigNumber.from("100"),
+    BigNumber.from("0"),
+    BigNumber.from("50"),
+    BigNumber.from("0"),
+    BigNumber.from("1"),
+    BigNumber.from("1"),
+    FEES_LP,
+    FEES_POOL,
+  ],
+  [
+    BigNumber.from("0"),
+    BigNumber.from("100"),
+    BigNumber.from("100"),
+    BigNumber.from("10"),
+    BigNumber.from("10"),
+    BigNumber.from("1"),
+    BigNumber.from("1"),
+    FEES_LP,
+    FEES_POOL,
+  ],
+  [
+    BigNumber.from("1"),
+    BigNumber.from("100"),
+    BigNumber.from("100"),
+    BigNumber.from("10"),
+    BigNumber.from("10"),
+    BigNumber.from("1"),
+    BigNumber.from("1"),
+    FEES_LP,
+    FEES_POOL,
+  ],
+];
+
+// getAmountOut params arrays side: +1
+const argsOut: BigNumber[][] = [
+  [
+    BigNumber.from("2"),
+    BigNumber.from("0"),
+    BigNumber.from("100"),
+    BigNumber.from("0"),
+    BigNumber.from("50"),
+    BigNumber.from("1"),
+    BigNumber.from("1"),
+    FEES_LP,
+    FEES_POOL,
+  ],
+  [
+    BigNumber.from("2"),
+    BigNumber.from("100"),
+    BigNumber.from("0"),
+    BigNumber.from("100"),
+    BigNumber.from("0"),
+    BigNumber.from("1"),
+    BigNumber.from("1"),
+    FEES_LP,
+    FEES_POOL,
+  ],
+  [
+    BigNumber.from("0"),
+    BigNumber.from("100"),
+    BigNumber.from("100"),
+    BigNumber.from("50"),
+    BigNumber.from("50"),
+    BigNumber.from("1"),
+    BigNumber.from("1"),
+    FEES_LP,
+    FEES_POOL,
+  ],
+  [
+    BigNumber.from("1"),
+    BigNumber.from("100"),
+    BigNumber.from("100"),
+    BigNumber.from("50"),
+    BigNumber.from("50"),
+    BigNumber.from("10"),
+    BigNumber.from("10"),
+    FEES_LP,
+    FEES_POOL,
+  ],
+];
+
+// to format getAmounts parameters
+export const getAmountsParams = (side: number) => {
+  const arr: GetAmountParametersStruct[] = [];
+  const args: BigNumber[][] = side < 0 ? argsIn : argsOut;
+
+  for (let i = 0; i < args.length; i++) {
+    arr.push({
+      amount: args[i][0],
+      reserveIn: args[i][1],
+      reserveOut: args[i][2],
+      fictiveReserveIn: args[i][3],
+      fictiveReserveOut: args[i][4],
+      priceAverageIn: args[i][5],
+      priceAverageOut: args[i][6],
+      feesLP: args[i][7],
+      feesPool: args[i][8],
+    });
+  }
+
+  return arr;
+};
+
+export const SIDE_AMOUNT_IN = -1;
+export const SIDE_AMOUNT_OUT = 1;
+
+export const isInRange = async (result: BigNumber, compared: BigNumber, PCT: BigNumber, BASE: BigNumber) =>
+  expect(result)
+    .to.be.lessThanOrEqual(compared.add(compared.mul(PCT).div(BASE)))
+    .to.be.greaterThanOrEqual(compared.sub(compared.mul(PCT).div(BASE)));

@@ -93,8 +93,8 @@ library PoolHelpers {
      * @return amountB_ equivalent amount of asset B
      */
     function quote(uint256 _amountA, uint256 _reserveA, uint256 _reserveB) internal pure returns (uint256 amountB_) {
-        require(_amountA > 0, "SmardexHelper: INSUFFICIENT_AMOUNT");
-        require(_reserveA > 0 && _reserveB > 0, "SmardexHelper: INSUFFICIENT_LIQUIDITY");
+        require(_amountA != 0, "SmardexHelper: INSUFFICIENT_AMOUNT");
+        require(_reserveA != 0 && _reserveB != 0, "SmardexHelper: INSUFFICIENT_LIQUIDITY");
         amountB_ = (_amountA * _reserveB) / _reserveA;
     }
 }

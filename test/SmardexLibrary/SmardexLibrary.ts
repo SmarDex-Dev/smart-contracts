@@ -12,8 +12,15 @@ import { shouldBehaveLikeGetUpdatedPriceAverage } from "./specs/getUpdatedPriceA
 export function unitTestsSmardexLibrary(): void {
   describe("SmardexLibraryTest", function () {
     beforeEach(async function () {
-      const { smardexLibraryTest } = await loadFixture(unitFixtureSmardexLibraryTest);
+      const { smardexLibraryTest, smardexRouter, smardexPair, token0, token1 } = await loadFixture(
+        unitFixtureSmardexLibraryTest,
+      );
+
       this.contracts.smardexLibraryTest = smardexLibraryTest;
+      this.contracts.smardexRouter = smardexRouter;
+      this.contracts.smardexPair = smardexPair;
+      this.token0 = token0;
+      this.token1 = token1;
     });
 
     describe("Get Updated Price Average", function () {

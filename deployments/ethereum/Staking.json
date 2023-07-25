@@ -1,5 +1,5 @@
 {
-  "address": "0xB940D63c2deD1184BbdE059AcC7fEE93654F02bf",
+  "address": "0x80497049b005Fd236591c3CD431DBD6E06eB1A31",
   "abi": [
     {
       "inputs": [
@@ -85,6 +85,37 @@
         {
           "indexed": false,
           "internalType": "uint256",
+          "name": "tokenReceived",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "shares",
+          "type": "uint256"
+        }
+      ],
+      "name": "EmergencyWithdraw",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "from",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "to",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
           "name": "value",
           "type": "uint256"
         }
@@ -126,6 +157,19 @@
     {
       "inputs": [],
       "name": "CAMPAIGN_ID",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "MINIMUM_SHARES",
       "outputs": [
         {
           "internalType": "uint256",
@@ -287,6 +331,19 @@
         }
       ],
       "name": "depositWithPermit",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_to",
+          "type": "address"
+        }
+      ],
+      "name": "emergencyWithdraw",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
@@ -553,5 +610,6 @@
       "stateMutability": "nonpayable",
       "type": "function"
     }
-  ]
+  ],
+  "numDeployments": 2
 }

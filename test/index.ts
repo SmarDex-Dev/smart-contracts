@@ -4,10 +4,10 @@ import { unitTestsSmardexPair } from "./SmardexPair/SmardexPair";
 import { unitTestsSmardexRouter } from "./SmardexRouter/SmardexRouter";
 import { unitTestsSmardexERC20 } from "./SmardexERC20/SmardexERC20";
 import { unitTestsFarmingRange } from "./FarmingRange/FarmingRange";
-import { unitTestsStaking } from "./Staking/Staking";
 import { unitTestsAutoSwapper } from "./AutoSwapper/AutoSwapper";
 import { unitTestsRewardManager } from "./RewardManager/RewardManager";
 import { unitTestsSmardexLibrary } from "./SmardexLibrary/SmardexLibrary";
+import { unitTestsStaking } from "./Staking/Staking";
 
 baseContext("Unit Tests", function () {
   unitTestsSmardexERC20();

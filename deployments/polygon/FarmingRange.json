@@ -1,5 +1,5 @@
 {
-  "address": "0xe74A7a544534DA80fBaC4d2475a6fDc03388154f",
+  "address": "0x7DB73A1e526db36c40e508b09428420c1fA8e46b",
   "abi": [
     {
       "inputs": [
@@ -179,19 +179,6 @@
       "anonymous": false,
       "inputs": [
         {
-          "indexed": false,
-          "internalType": "address",
-          "name": "rewardManager",
-          "type": "address"
-        }
-      ],
-      "name": "SetRewardManager",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
           "indexed": true,
           "internalType": "uint256",
           "name": "campaignID",
@@ -309,6 +296,34 @@
         }
       ],
       "name": "addRewardInfoMultiple",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "contract IERC20",
+          "name": "_token",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "_from",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "_to",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "_amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "attemptTransfer",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
@@ -684,19 +699,6 @@
       "inputs": [
         {
           "internalType": "address",
-          "name": "_rewardManager",
-          "type": "address"
-        }
-      ],
-      "name": "setRewardManager",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
           "name": "newOwner",
           "type": "address"
         }
@@ -804,13 +806,6 @@
       "type": "function"
     },
     {
-      "inputs": [],
-      "name": "upgradePrecision",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
       "inputs": [
         {
           "internalType": "uint256",
@@ -857,5 +852,6 @@
       "stateMutability": "nonpayable",
       "type": "function"
     }
-  ]
+  ],
+  "numDeployments": 1
 }

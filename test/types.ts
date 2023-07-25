@@ -1,24 +1,29 @@
 import type { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signer-with-address";
 import {
   AutoSwapper,
+  AutoSwapperL2,
   CallbackTest,
-  CheckBlockTest,
   ERC20Permit,
   ERC20Test,
   FakeERC20reentrancy,
   FarmingRange,
-  RewardManager,
+  FarmingRangeL2Arbitrum,
+  RewardManagerTest,
+  RewardManagerTestL2,
+  RewardManagerTestL2Arbitrum,
   RouterEventEmitter,
   RouterForPairTest,
   SmardexFactory,
   SmardexFactoryTest,
   SmardexLibraryTest,
+  SmardexLibrary,
   SmardexPair,
   SmardexPairTest,
   SmardexRouter,
   SmardexRouterTest,
   SmardexTokenTest,
   Staking,
+  TetherToken,
   WETH9,
 } from "../typechain";
 import { BigNumber } from "ethers";
@@ -36,6 +41,7 @@ export interface Contracts {
   smardexFactory: SmardexFactory;
   smardexFactoryTest: SmardexFactoryTest;
   smardexLibraryTest: SmardexLibraryTest;
+  smardexLibrary: SmardexLibrary;
   smardexToken: ERC20Permit;
   smardexTokenTest: SmardexTokenTest;
   token0: ERC20Test;
@@ -45,41 +51,31 @@ export interface Contracts {
   smardexPairTest: SmardexPairTest;
   smardexRouter: SmardexRouter;
   smardexRouterTest: SmardexRouterTest;
+  staking: Staking;
   WETH: WETH9;
   WETHPartner: ERC20Test;
   WETHPair: SmardexPair;
   routerEventEmitter: RouterEventEmitter;
   deflatingPair: SmardexPair;
-  staking: Staking;
-  farming: FarmingRange;
-  checkBlockTest: CheckBlockTest;
-  autoSwapper: AutoSwapper;
-  rewardManager: RewardManager;
+  farming: FarmingRange | FarmingRangeL2Arbitrum;
+  autoSwapper: AutoSwapper | AutoSwapperL2;
+  rewardManagerTest: RewardManagerTest | RewardManagerTestL2 | RewardManagerTestL2Arbitrum;
   smardexRouterCallbackTest: CallbackTest;
   routerForPairTest: RouterForPairTest;
   fakeERC20reentrancy: FakeERC20reentrancy;
-}
-
-export interface IFarming {
-  token0: ERC20Test;
-  token1: ERC20Test;
-  WETH: WETH9;
-  WETHPartner: ERC20Test;
-  factory: SmardexFactory;
-  smardexRouter: SmardexRouter;
-  pair: SmardexPair;
-  WETHPair: SmardexPair;
-  routerEventEmitter: RouterEventEmitter;
-  autoSwapper: AutoSwapper;
-  smardexToken: ERC20Test;
+  stakingToken: ERC20Test;
+  dummyStakingToken: ERC20Test;
+  tether: TetherToken;
 }
 
 export interface Misc {
   startBlock: BigNumber;
+  targetAddress: string;
 }
 
 export interface Signers {
   admin: SignerWithAddress;
   feeTo: SignerWithAddress;
   user: SignerWithAddress;
+  user2: SignerWithAddress;
 }

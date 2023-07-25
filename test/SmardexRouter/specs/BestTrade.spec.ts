@@ -409,7 +409,7 @@ export function testNewSmardex() {
 
         await doubleSwapRouter
           .connect(signers[1])
-          .doubleSwapExactOutExactIn(smardexRouter.address, indexSwap.toString(), parseEther("20000000"), [
+          .doubleSwapExactOutExactIn(smardexRouter.address, indexSwap, parseEther("20000000"), [
             token1.address,
             token0.address,
           ]);
@@ -477,7 +477,7 @@ export function testHack() {
       try {
         await doubleSwapRouter
           .connect(signers[1])
-          .doubleSwapExactOutExactIn(smardexRouter.address, indexSwap.toString(), parseEther("20000000"), [
+          .doubleSwapExactOutExactIn(smardexRouter.address, indexSwap, parseEther("20000000"), [
             token1.address,
             token0.address,
           ]);

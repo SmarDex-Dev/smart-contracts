@@ -90,8 +90,7 @@ export function shouldBehaveLikeSwapTokensForExactTokens(): void {
 
   it("to of the swap can be router with address zero", async function () {
     await this.contracts.token0.approve(this.contracts.smardexRouter.address, constants.MaxUint256);
-
-    await expect(
+    const balanceBefore = await expect(
       this.contracts.smardexRouter.swapTokensForExactTokens(
         outputAmount,
         constants.MaxUint256,
@@ -99,8 +98,8 @@ export function shouldBehaveLikeSwapTokensForExactTokens(): void {
         constants.AddressZero,
         constants.MaxUint256,
       ),
-    ).to.not.be.reverted;
+    ).to.be.revertedWith("SmarDexRouter: INVALID_RECIPIENT");
 
-    expect(await this.contracts.token1.balanceOf(this.contracts.smardexRouter.address)).to.be.eq(outputAmount);
+    // expect(await this.contracts.token1.balanceOf(this.contracts.smardexRouter.address)).to.be.eq(outputAmount);
   });
 }

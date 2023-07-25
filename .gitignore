@@ -130,5 +130,6 @@ resultSlither.md
 
 # temporary folder
 tmp
+multicalls/
 script/res.txt
 script/*.ps1

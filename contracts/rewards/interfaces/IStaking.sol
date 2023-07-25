@@ -7,7 +7,7 @@ import "./IFarmingRange.sol";
 
 interface IStaking is IERC20 {
     /**
-     * @notice iunfo of each user
+     * @notice info of each user
      * @param shares shares owned in the staking
      * @param lastBlockUpdate last block the user called deposit or withdraw
      */
@@ -32,6 +32,15 @@ interface IStaking is IERC20 {
      * @param shares shares corresponding to the token amount withdrawn
      */
     event Withdraw(address indexed from, address indexed to, uint256 tokenReceived, uint256 shares);
+
+    /**
+     * @notice emitted when calling emergencyWithdraw
+     * @param from address that calls the withdraw function, and of which the shares are withdrawn
+     * @param to address that receives the funds
+     * @param tokenReceived amount of token received by to
+     * @param shares shares corresponding to the token amount withdrawn
+     */
+    event EmergencyWithdraw(address indexed from, address indexed to, uint256 tokenReceived, uint256 shares);
 
     /**
      * @notice Initialize staking connection with farming
@@ -70,6 +79,15 @@ interface IStaking is IERC20 {
      * @param _sharesAmount The amount of shares to use
      */
     function withdraw(address _to, uint256 _sharesAmount) external;
+
+    /**
+     * @notice Withdraw SDEX for all shares of the sender, will not harvest before. Only use this function in emergency
+     *         WARNING: This function may result in a lower amount of SDEX being withdrawn because it bypasses potential
+     *         SDEX earnings from farming.
+     *         Only use this function if standard withdrawal does not work for unknown reasons.
+     * @param _to The address who will receive SDEX
+     */
+    function emergencyWithdraw(address _to) external;
 
     /**
      * @notice Harvest the farming pool for the staking, will increase the SDEX

@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.17;
 
-import "./interfaces/IStaking.sol";
+// libraries
 import "@openzeppelin/contracts/token/ERC20/extensions/draft-IERC20Permit.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+
+// interfaces
+import "./interfaces/IStaking.sol";
 
 /**
  * @title Staking
@@ -41,6 +44,8 @@ contract Staking is IStaking, ERC20 {
     }
 
     constructor(IERC20 _smardexToken, IFarmingRange _farming) ERC20("Staked SmarDex Token", "stSDEX") {
+        require(address(_smardexToken) != address(0), "Staking::constructor::Smardex token is not defined");
+        require(address(_farming) != address(0), "Staking::constructor::Farming is not defined");
         smardexToken = _smardexToken;
         farming = _farming;
     }
@@ -57,14 +62,12 @@ contract Staking is IStaking, ERC20 {
 
     /// @inheritdoc IStaking
     function deposit(uint256 _depositAmount) public isFarmingInitialized checkUserBlock {
-        require(_depositAmount > 0, "Staking::deposit::can't deposit zero token");
+        require(_depositAmount != 0, "Staking::deposit::can't deposit zero token");
 
         harvestFarming();
 
         uint256 _currentBalance = smardexToken.balanceOf(address(this));
         uint256 _newShares = _tokensToShares(_depositAmount, _currentBalance);
-
-        smardexToken.safeTransferFrom(msg.sender, address(this), _depositAmount);
 
         uint256 _userNewShares;
         if (totalShares == 0) {
@@ -72,9 +75,11 @@ contract Staking is IStaking, ERC20 {
         } else {
             _userNewShares = _newShares;
         }
-        require(_userNewShares > 0, "Staking::deposit::no new shares received");
+        require(_userNewShares != 0, "Staking::deposit::no new shares received");
         userInfo[msg.sender].shares += _userNewShares;
         totalShares += _newShares;
+
+        smardexToken.safeTransferFrom(msg.sender, address(this), _depositAmount);
 
         emit Deposit(msg.sender, _depositAmount, _userNewShares);
     }
@@ -105,7 +110,7 @@ contract Staking is IStaking, ERC20 {
     /// @inheritdoc IStaking
     function withdraw(address _to, uint256 _sharesAmount) external isFarmingInitialized checkUserBlock {
         require(
-            _sharesAmount > 0 && userInfo[msg.sender].shares >= _sharesAmount,
+            _sharesAmount != 0 && userInfo[msg.sender].shares >= _sharesAmount,
             "Staking::withdraw::can't withdraw more than user shares or zero"
         );
 
@@ -119,6 +124,21 @@ contract Staking is IStaking, ERC20 {
         smardexToken.safeTransfer(_to, _tokensToWithdraw);
 
         emit Withdraw(msg.sender, _to, _tokensToWithdraw, _sharesAmount);
+    }
+
+    /// @inheritdoc IStaking
+    function emergencyWithdraw(address _to) external isFarmingInitialized checkUserBlock {
+        require(userInfo[msg.sender].shares != 0, "Staking::emergencyWithdraw::no shares to withdraw");
+
+        uint256 _sharesAmount = userInfo[msg.sender].shares;
+        uint256 _currentBalance = smardexToken.balanceOf(address(this));
+        uint256 _tokensToWithdraw = _sharesToTokens(_sharesAmount, _currentBalance);
+
+        totalShares -= _sharesAmount;
+        userInfo[msg.sender].shares = 0;
+        smardexToken.safeTransfer(_to, _tokensToWithdraw);
+
+        emit EmergencyWithdraw(msg.sender, _to, _tokensToWithdraw, _sharesAmount);
     }
 
     /// @inheritdoc IStaking
@@ -149,7 +169,7 @@ contract Staking is IStaking, ERC20 {
      * @return shares_ shares equivalent to the token amount. _shares <= totalShares
      */
     function _tokensToShares(uint256 _tokens, uint256 _currentBalance) internal view returns (uint256 shares_) {
-        shares_ = totalShares > 0 ? (_tokens * totalShares) / _currentBalance : _tokens * SHARES_FACTOR;
+        shares_ = totalShares != 0 ? (_tokens * totalShares) / _currentBalance : _tokens * SHARES_FACTOR;
     }
 
     /**
@@ -159,6 +179,6 @@ contract Staking is IStaking, ERC20 {
      * @return tokens_ qty of sdex token equivalent to the _shares. tokens_ <= _currentBalance
      */
     function _sharesToTokens(uint256 _shares, uint256 _currentBalance) internal view returns (uint256 tokens_) {
-        tokens_ = totalShares > 0 ? (_shares * _currentBalance) / totalShares : _shares / SHARES_FACTOR;
+        tokens_ = totalShares != 0 ? (_shares * _currentBalance) / totalShares : _shares / SHARES_FACTOR;
     }
 }

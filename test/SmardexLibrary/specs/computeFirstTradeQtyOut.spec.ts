@@ -1,6 +1,6 @@
 import { parseEther } from "ethers/lib/utils";
 import { expect } from "chai";
-import { sqrt } from "../utils";
+import { sqrt } from "../../utils";
 import { FEES_BASE, FEES_LP, FEES_POOL, FEES_TOTAL_REVERSED } from "../../constants";
 
 export function shouldBehaveLikeComputeFirstTradeQtyOut(): void {
@@ -17,6 +17,8 @@ export function shouldBehaveLikeComputeFirstTradeQtyOut(): void {
       fictiveReserveOut,
       priceAverageIn,
       priceAverageOut,
+      FEES_LP,
+      FEES_POOL,
     );
     expect(amountOut).to.be.eq(result);
   });
@@ -34,6 +36,8 @@ export function shouldBehaveLikeComputeFirstTradeQtyOut(): void {
       fictiveReserveOut,
       priceAverageIn,
       priceAverageOut,
+      FEES_LP,
+      FEES_POOL,
     );
     expect(amountOut).to.be.eq(result);
   });
@@ -45,12 +49,16 @@ export function shouldBehaveLikeComputeFirstTradeQtyOut(): void {
     const priceAverageIn = parseEther("10");
     const priceAverageOut = parseEther("8");
 
+    let firstAmountOut = amountOut;
+
     const result = await this.contracts.smardexLibraryTest.computeFirstTradeQtyOut(
       amountOut,
       fictiveReserveIn,
       fictiveReserveOut,
       priceAverageIn,
       priceAverageOut,
+      FEES_LP,
+      FEES_POOL,
     );
     const fictiveReserveOutPredictedFees = fictiveReserveIn.mul(FEES_LP).mul(priceAverageOut).div(priceAverageIn);
     const toAdd = fictiveReserveOut.mul(FEES_TOTAL_REVERSED).mul(2).add(fictiveReserveOutPredictedFees);
@@ -62,7 +70,10 @@ export function shouldBehaveLikeComputeFirstTradeQtyOut(): void {
       .div(FEES_LP)
       .add(fictiveReserveOutPredictedFees.mul(fictiveReserveOutPredictedFees));
 
-    const firstAmountOut = toAdd.sub(sqrt(inSqrt)).div(toDiv);
+    if (inSqrt.gt(toAdd.sub(amountOut.mul(toDiv)).pow(2))) {
+      firstAmountOut = toAdd.sub(sqrt(inSqrt)).div(toDiv);
+    }
+
     expect(firstAmountOut).to.be.eq(result);
   });
 
@@ -101,6 +112,8 @@ export function shouldBehaveLikeComputeFirstTradeQtyOut(): void {
         value.fictiveReserveOut,
         value.priceAverageIn,
         value.priceAverageOut,
+        FEES_LP,
+        FEES_POOL,
       );
       expect(result).to.be.eq(value.firstTradeQtyOut);
     }

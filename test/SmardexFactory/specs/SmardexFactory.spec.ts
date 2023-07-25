@@ -3,6 +3,7 @@ import { getCreate2Address } from "../utils";
 import { constants } from "ethers/lib/ethers";
 import { SmardexFactory, SmardexPair, SmardexPair__factory } from "../../../typechain";
 import { ethers } from "hardhat";
+import { FEES_LP, FEES_POOL, FEES_BASE, MAX_UINT128 } from "../../constants";
 
 const TEST_ADDRESSES: [string, string] = [
   "0x1000000000000000000000000000000000000000",
@@ -10,9 +11,9 @@ const TEST_ADDRESSES: [string, string] = [
 ];
 
 export function shouldBehaveLikeUniswapV2Factory(): void {
-  it("feeTo, feeToSetter, allPairsLength", async function () {
+  it("feeTo, owner, allPairsLength", async function () {
     expect(await this.contracts.smardexFactory.feeTo()).to.eq(constants.Zero);
-    expect(await this.contracts.smardexFactory.feeToSetter()).to.eq(this.signers.admin.address);
+    expect(await this.contracts.smardexFactory.owner()).to.eq(this.signers.admin.address);
     expect(await this.contracts.smardexFactory.allPairsLength()).to.eq(0);
   });
 
@@ -51,19 +52,40 @@ export function shouldBehaveLikeUniswapV2Factory(): void {
   it("setFeeTo", async function () {
     await expect(
       this.contracts.smardexFactory.connect(this.signers.user).setFeeTo(this.signers.user.address),
-    ).to.be.revertedWith("SmarDex: FORBIDDEN");
+    ).to.be.revertedWith("Ownable: caller is not the owner");
     await this.contracts.smardexFactory.setFeeTo(this.signers.admin.address);
     expect(await this.contracts.smardexFactory.feeTo()).to.eq(this.signers.admin.address);
   });
 
-  it("setFeeToSetter", async function () {
+  it("transferOwnership", async function () {
     await expect(
-      this.contracts.smardexFactory.connect(this.signers.user).setFeeToSetter(this.signers.user.address),
-    ).to.be.revertedWith("SmarDex: FORBIDDEN");
-    await this.contracts.smardexFactory.setFeeToSetter(this.signers.user.address);
-    expect(await this.contracts.smardexFactory.feeToSetter()).to.eq(this.signers.user.address);
-    await expect(this.contracts.smardexFactory.setFeeToSetter(this.signers.admin.address)).to.be.revertedWith(
-      "SmarDex: FORBIDDEN",
+      this.contracts.smardexFactory.connect(this.signers.user).transferOwnership(this.signers.user.address),
+    ).to.be.revertedWith("Ownable: caller is not the owner");
+    await this.contracts.smardexFactory.transferOwnership(this.signers.user.address);
+    expect(await this.contracts.smardexFactory.owner()).to.eq(this.signers.user.address);
+    await expect(this.contracts.smardexFactory.transferOwnership(this.signers.admin.address)).to.be.revertedWith(
+      "Ownable: caller is not the owner",
     );
+  });
+
+  it("setFees", async function () {
+    await expect(
+      this.contracts.smardexFactory.connect(this.signers.user).setFees(FEES_LP, FEES_POOL),
+    ).to.be.revertedWith("Ownable: caller is not the owner");
+    await this.contracts.smardexFactory.transferOwnership(this.signers.user.address);
+    expect(await this.contracts.smardexFactory.owner()).to.eq(this.signers.user.address);
+    await expect(this.contracts.smardexFactory.transferOwnership(this.signers.admin.address)).to.be.revertedWith(
+      "Ownable: caller is not the owner",
+    );
+    await this.contracts.smardexFactory.connect(this.signers.user).transferOwnership(this.signers.admin.address);
+    await expect(this.contracts.smardexFactory.setFees(0, FEES_POOL)).to.be.revertedWith("SmarDex: ZERO_FEES_LP");
+
+    const limit = FEES_BASE.div(10);
+
+    await expect(this.contracts.smardexFactory.setFees(limit, 0)).to.not.be.revertedWith("SmarDex: FEES_MAX");
+
+    await expect(this.contracts.smardexFactory.setFees(limit, 1)).to.be.revertedWith("SmarDex: FEES_MAX");
+    await expect(this.contracts.smardexFactory.setFees(MAX_UINT128, 0)).to.be.revertedWith("SmarDex: FEES_MAX");
+    await expect(this.contracts.smardexFactory.setFees(constants.MaxUint256, 0)).to.be.revertedWithPanic;
   });
 }

@@ -1,33 +1,54 @@
 import { DeployFunction } from "hardhat-deploy/types";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
+import { artifacts, Networks } from "./utils";
+
+let autoSwapperArtifact: string = "AutoSwapper";
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployments, getNamedAccounts } = hre;
   const { deploy } = deployments;
   const { getContractAt } = hre.ethers;
-
   const { admin } = await getNamedAccounts();
-
+  const chainId: string = await hre.getChainId();
   const factory = await deployments.get("SmardexFactory");
   const sdex = await deployments.get("SmardexToken");
-  const rewardManager = await deployments.get("RewardManager");
 
-  const rewardManagerContract = await getContractAt("RewardManager", rewardManager.address);
-  const stakingAddress = await rewardManagerContract.staking();
-  const famingAddress = await rewardManagerContract.farming();
+  let staking: boolean = true;
+  let rewardManagerArtifact: string = "RewardManager";
+  let stakingAddress: string = "";
+  const args: string[] = [factory.address, sdex.address];
 
-  console.log("Staking deployed in", stakingAddress);
-  console.log("Farming deployed in", famingAddress);
+  const networkArtifacts: Networks[] = artifacts.filter(artifact => artifact.name === hre.network.name);
 
-  const autoSwapper = await deploy("AutoSwapper", {
+  if (networkArtifacts.length > 0) {
+    staking = networkArtifacts[0].staking;
+    rewardManagerArtifact = networkArtifacts[0].rewardManager;
+    autoSwapperArtifact = networkArtifacts[0].autoswapper;
+  }
+
+  const rewardManager = await deployments.get(rewardManagerArtifact);
+  const rewardManagerContract = await getContractAt(rewardManagerArtifact, rewardManager.address);
+
+  if (staking) {
+    stakingAddress = await rewardManagerContract.staking();
+    console.log("Staking deployed in", stakingAddress);
+    args.push(stakingAddress);
+  }
+
+  const farmingAddress: string = await rewardManagerContract.farming();
+  console.log("Farming deployed in", farmingAddress);
+
+  const autoSwapper = await deploy(autoSwapperArtifact, {
     from: admin,
-    args: [factory.address, sdex.address, stakingAddress],
+    args,
     log: true,
-    autoMine: true, // speed up deployment on local network (ganache, hardhat), no effect on live networks
   });
 
-  const factoryContract = await getContractAt("SmardexFactory", factory.address);
-  await factoryContract.setFeeTo(autoSwapper.address);
+  // prevent seeFeeToo without ownership on ethereum mainnet
+  if (chainId !== "1") {
+    const factoryContract = await getContractAt("SmardexFactory", factory.address);
+    await (await factoryContract.setFeeTo(autoSwapper.address)).wait();
+  }
 };
 export default func;
-func.tags = ["AutoSwapper"];
+func.tags = [autoSwapperArtifact];

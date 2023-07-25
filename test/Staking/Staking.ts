@@ -10,6 +10,8 @@ import { shouldBehaveLikeSharesToTokens } from "./specs/sharesToTokens.spec";
 import { shouldBehaveLikeTokensToShares } from "./specs/tokensToShares.spec";
 import { shouldBehaveLikeDepositWithPermit } from "./specs/depositWithPermit.spec";
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
+import { shouldBehaveLikeEmergencyWithdraw } from "./specs/emergencyWithdraw.spec";
+import { shouldBehaveLikeStakingConstructor } from "./specs/stakingConstructor.spec";
 
 export function unitTestsStaking(): void {
   describe("Staking", function () {
@@ -27,12 +29,21 @@ export function unitTestsStaking(): void {
         .connect(this.signers.user)
         .approve(this.contracts.staking.address, constants.MaxUint256);
     });
+
+    describe("constructor ", function () {
+      shouldBehaveLikeStakingConstructor();
+    });
+
     describe("deposit", function () {
       shouldBehaveLikeDeposit();
     });
 
     describe("depositWithPermit", function () {
       shouldBehaveLikeDepositWithPermit();
+    });
+
+    describe("emergency withdraw", function () {
+      shouldBehaveLikeEmergencyWithdraw();
     });
 
     describe("withdraw", function () {

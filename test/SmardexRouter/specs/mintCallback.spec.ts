@@ -35,7 +35,7 @@ export function shouldBehaveLikeMintCallback() {
       constants.MaxUint256,
     );
     // get fees
-    const feeToAmount = await this.contracts.smardexPair.getFees();
+    const feeToAmount = await this.contracts.smardexPair.getFeeToAmounts();
     expect(feeToAmount.fees0_).to.be.gt(0);
     expect(feeToAmount.fees1_).to.be.gt(0);
     await expect(

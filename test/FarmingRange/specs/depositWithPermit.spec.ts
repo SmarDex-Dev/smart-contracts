@@ -1,5 +1,5 @@
 import { unitFixtureCampaignWith2rewards, UnitFixtureFarmingRange } from "../../fixtures";
-import { INITIAL_BONUS_REWARD_PER_BLOCK } from "../testData";
+import { INITIAL_BONUS_REWARD_PER_BLOCK } from "../utils";
 import { expect } from "chai";
 import { parseEther } from "ethers/lib/utils";
 import { getPermitSignature } from "../../utils";

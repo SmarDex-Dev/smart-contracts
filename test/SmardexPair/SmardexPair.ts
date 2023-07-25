@@ -7,6 +7,7 @@ import { constants } from "ethers";
 import { shouldBehaveLikeSwap } from "./specs/swap.spec";
 import { shouldBehaveLikeSwapWithValues } from "./specs/swapWithValues.spec";
 import { shouldBehaveLikeInitialize } from "./specs/initialize.spec";
+import { shouldSetFeesUnderLimits } from "./specs/setFees.spec";
 
 export function unitTestsSmardexPair(): void {
   describe("SmarDexPair", function () {
@@ -62,6 +63,24 @@ export function unitTestsSmardexPair(): void {
       });
       describe("", function () {
         shouldBehaveLikeSwapWithValues();
+      });
+    });
+
+    describe("set fees tests", function () {
+      beforeEach(async function () {
+        const { factory, smardexPairTest, token0, token1, smardexRouterTest } = await loadFixture(
+          unitFixtureSmardexPairTest,
+        );
+
+        this.contracts.smardexFactory = factory;
+        this.contracts.smardexPairTest = smardexPairTest;
+        this.contracts.token0 = token0;
+        this.contracts.token1 = token1;
+        this.contracts.routerForPairTest = smardexRouterTest;
+      });
+
+      describe("change pair fees", function () {
+        shouldSetFeesUnderLimits();
       });
     });
   });

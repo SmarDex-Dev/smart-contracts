@@ -28,17 +28,12 @@ contract FarmingRange is IFarmingRange, Ownable, ReentrancyGuard {
     mapping(uint256 => mapping(address => UserInfo)) public userInfo;
 
     uint256 public rewardInfoLimit;
-    address public rewardManager;
+    address public immutable rewardManager;
 
     constructor(address _rewardManager) {
         rewardInfoLimit = 52;
+        require(_rewardManager != address(0), "FarmingRange::constructor::Reward manager is not defined");
         rewardManager = _rewardManager;
-    }
-
-    /// @inheritdoc IFarmingRange
-    function setRewardManager(address _rewardManager) external onlyOwner {
-        rewardManager = _rewardManager;
-        emit SetRewardManager(_rewardManager);
     }
 
     /// @inheritdoc IFarmingRange
@@ -48,7 +43,12 @@ contract FarmingRange is IFarmingRange, Ownable, ReentrancyGuard {
     }
 
     /// @inheritdoc IFarmingRange
-    function addCampaignInfo(IERC20 _stakingToken, IERC20 _rewardToken, uint256 _startBlock) external onlyOwner {
+    function addCampaignInfo(
+        IERC20 _stakingToken,
+        IERC20 _rewardToken,
+        uint256 _startBlock
+    ) external virtual onlyOwner {
+        require(_startBlock > block.number, "FarmingRange::addCampaignInfo::Start block should be in the future");
         campaignInfo.push(
             CampaignInfo({
                 stakingToken: _stakingToken,
@@ -64,7 +64,11 @@ contract FarmingRange is IFarmingRange, Ownable, ReentrancyGuard {
     }
 
     /// @inheritdoc IFarmingRange
-    function addRewardInfo(uint256 _campaignID, uint256 _endBlock, uint256 _rewardPerBlock) public onlyOwner {
+    function addRewardInfo(
+        uint256 _campaignID,
+        uint256 _endBlock,
+        uint256 _rewardPerBlock
+    ) public virtual onlyOwner nonReentrant {
         RewardInfo[] storage rewardInfo = campaignRewardInfo[_campaignID];
         CampaignInfo storage campaign = campaignInfo[_campaignID];
         require(
@@ -82,9 +86,9 @@ contract FarmingRange is IFarmingRange, Ownable, ReentrancyGuard {
         uint256 _startBlock = rewardInfo.length == 0 ? campaign.startBlock : rewardInfo[rewardInfo.length - 1].endBlock;
         uint256 _blockRange = _endBlock - _startBlock;
         uint256 _totalRewards = _rewardPerBlock * _blockRange;
-        _transferFromWithAllowance(campaign.rewardToken, _totalRewards, _campaignID);
         campaign.totalRewards = campaign.totalRewards + _totalRewards;
         rewardInfo.push(RewardInfo({ endBlock: _endBlock, rewardPerBlock: _rewardPerBlock }));
+        _transferFromWithAllowance(campaign.rewardToken, _totalRewards, _campaignID);
         emit AddRewardInfo(_campaignID, rewardInfo.length - 1, _endBlock, _rewardPerBlock);
     }
 
@@ -95,8 +99,11 @@ contract FarmingRange is IFarmingRange, Ownable, ReentrancyGuard {
         uint256[] calldata _rewardPerBlock
     ) external onlyOwner {
         require(_endBlock.length == _rewardPerBlock.length, "FarmingRange::addRewardMultiple::wrong parameters length");
-        for (uint256 _i = 0; _i < _endBlock.length; _i++) {
+        for (uint256 _i; _i != _endBlock.length; ) {
             addRewardInfo(_campaignID, _endBlock[_i], _rewardPerBlock[_i]);
+            unchecked {
+                ++_i;
+            }
         }
     }
 
@@ -106,7 +113,7 @@ contract FarmingRange is IFarmingRange, Ownable, ReentrancyGuard {
         uint256 _rewardIndex,
         uint256 _endBlock,
         uint256 _rewardPerBlock
-    ) public onlyOwner {
+    ) public virtual onlyOwner nonReentrant {
         RewardInfo[] storage rewardInfo = campaignRewardInfo[_campaignID];
         CampaignInfo storage campaign = campaignInfo[_campaignID];
         RewardInfo storage selectedRewardInfo = rewardInfo[_rewardIndex];
@@ -133,10 +140,9 @@ contract FarmingRange is IFarmingRange, Ownable, ReentrancyGuard {
             campaign,
             selectedRewardInfo
         );
-        if (!_refund && _diff > 0) {
+        if (!_refund && _diff != 0) {
             _transferFromWithAllowance(campaign.rewardToken, _diff, _campaignID);
         }
-
         // If _endblock is changed, and if we have another range after the updated one,
         // we need to update rewardPerBlock to distribute on the next new range or we could run out of tokens
         if (_endBlock != _previousEndBlock && rewardInfo.length - 1 > _rewardIndex) {
@@ -144,11 +150,14 @@ contract FarmingRange is IFarmingRange, Ownable, ReentrancyGuard {
             uint256 _nextRewardInfoEndBlock = nextRewardInfo.endBlock;
             uint256 _initialBlockRange = _nextRewardInfoEndBlock - _previousEndBlock;
             uint256 _nextBlockRange = _nextRewardInfoEndBlock - _endBlock;
-            uint256 _initialNextTotal = _initialBlockRange * nextRewardInfo.rewardPerBlock;
-            nextRewardInfo.rewardPerBlock = (nextRewardInfo.rewardPerBlock * _initialBlockRange) / _nextBlockRange;
-            uint256 _nextTotal = _nextBlockRange * nextRewardInfo.rewardPerBlock;
+            uint256 _currentRewardPerBlock = nextRewardInfo.rewardPerBlock;
+            uint256 _initialNextTotal = _initialBlockRange * _currentRewardPerBlock;
+            _currentRewardPerBlock = (_currentRewardPerBlock * _initialBlockRange) / _nextBlockRange;
+            uint256 _nextTotal = _nextBlockRange * _currentRewardPerBlock;
+            nextRewardInfo.rewardPerBlock = _currentRewardPerBlock;
             if (_nextTotal < _initialNextTotal) {
                 campaign.rewardToken.safeTransfer(rewardManager, _initialNextTotal - _nextTotal);
+                campaign.totalRewards -= _initialNextTotal - _nextTotal;
             }
         }
         // UPDATE total
@@ -169,8 +178,11 @@ contract FarmingRange is IFarmingRange, Ownable, ReentrancyGuard {
             _rewardIndex.length == _endBlock.length && _rewardIndex.length == _rewardPerBlock.length,
             "FarmingRange::updateRewardMultiple::wrong parameters length"
         );
-        for (uint256 _i = 0; _i < _rewardIndex.length; _i++) {
+        for (uint256 _i; _i != _rewardIndex.length; ) {
             updateRewardInfo(_campaignID, _rewardIndex[_i], _endBlock[_i], _rewardPerBlock[_i]);
+            unchecked {
+                ++_i;
+            }
         }
     }
 
@@ -187,17 +199,20 @@ contract FarmingRange is IFarmingRange, Ownable, ReentrancyGuard {
                 _rewardIndex.length == _rewardPerBlock.length,
             "FarmingRange::updateCampaignsRewards::wrong rewardInfo length"
         );
-        for (uint256 _i = 0; _i < _campaignID.length; _i++) {
+        for (uint256 _i; _i != _campaignID.length; ) {
             updateRewardMultiple(_campaignID[_i], _rewardIndex[_i], _endBlock[_i], _rewardPerBlock[_i]);
+            unchecked {
+                ++_i;
+            }
         }
     }
 
     /// @inheritdoc IFarmingRange
-    function removeLastRewardInfo(uint256 _campaignID) external onlyOwner {
+    function removeLastRewardInfo(uint256 _campaignID) external virtual onlyOwner {
         RewardInfo[] storage rewardInfo = campaignRewardInfo[_campaignID];
         CampaignInfo storage campaign = campaignInfo[_campaignID];
         uint256 _rewardInfoLength = rewardInfo.length;
-        require(_rewardInfoLength > 0, "FarmingRange::updateCampaignsRewards::no rewardInfoLen");
+        require(_rewardInfoLength != 0, "FarmingRange::updateCampaignsRewards::no rewardInfoLen");
         RewardInfo storage lastRewardInfo = rewardInfo[_rewardInfoLength - 1];
         uint256 _lastRewardInfoEndBlock = lastRewardInfo.endBlock;
         require(_lastRewardInfoEndBlock > block.number, "FarmingRange::removeLastRewardInfo::reward period ended");
@@ -205,7 +220,7 @@ contract FarmingRange is IFarmingRange, Ownable, ReentrancyGuard {
         if (lastRewardInfo.rewardPerBlock != 0) {
             (bool _refund, uint256 _diff) = _updateRewardsDiff(
                 _rewardInfoLength - 1,
-                block.number > _lastRewardInfoEndBlock ? block.number : _lastRewardInfoEndBlock,
+                _lastRewardInfoEndBlock,
                 0,
                 rewardInfo,
                 campaign,
@@ -230,12 +245,12 @@ contract FarmingRange is IFarmingRange, Ownable, ReentrancyGuard {
     }
 
     /// @inheritdoc IFarmingRange
-    function currentEndBlock(uint256 _campaignID) external view returns (uint256) {
+    function currentEndBlock(uint256 _campaignID) external view virtual returns (uint256) {
         return _endBlockOf(_campaignID, block.number);
     }
 
     /// @inheritdoc IFarmingRange
-    function currentRewardPerBlock(uint256 _campaignID) external view returns (uint256) {
+    function currentRewardPerBlock(uint256 _campaignID) external view virtual returns (uint256) {
         return _rewardPerBlockOf(_campaignID, block.number);
     }
 
@@ -264,8 +279,11 @@ contract FarmingRange is IFarmingRange, Ownable, ReentrancyGuard {
     /// @inheritdoc IFarmingRange
     function massUpdateCampaigns() external nonReentrant {
         uint256 _length = campaignInfo.length;
-        for (uint256 _pid = 0; _pid < _length; ++_pid) {
-            _updateCampaign(_pid);
+        for (uint256 _i; _i != _length; ) {
+            _updateCampaign(_i);
+            unchecked {
+                ++_i;
+            }
         }
     }
 
@@ -274,16 +292,16 @@ contract FarmingRange is IFarmingRange, Ownable, ReentrancyGuard {
         CampaignInfo storage campaign = campaignInfo[_campaignID];
         UserInfo storage user = userInfo[_campaignID][msg.sender];
         _updateCampaign(_campaignID);
-        if (user.amount > 0) {
+        if (user.amount != 0) {
             uint256 _pending = (user.amount * campaign.accRewardPerShare) / 1e20 - user.rewardDebt;
-            if (_pending > 0) {
+            if (_pending != 0) {
                 campaign.rewardToken.safeTransfer(address(msg.sender), _pending);
             }
         }
-        if (_amount > 0) {
-            campaign.stakingToken.safeTransferFrom(msg.sender, address(this), _amount);
+        if (_amount != 0) {
             user.amount = user.amount + _amount;
             campaign.totalStaked = campaign.totalStaked + _amount;
+            campaign.stakingToken.safeTransferFrom(msg.sender, address(this), _amount);
         }
         user.rewardDebt = (user.amount * campaign.accRewardPerShare) / (1e20);
         emit Deposit(msg.sender, _amount, _campaignID);
@@ -320,8 +338,11 @@ contract FarmingRange is IFarmingRange, Ownable, ReentrancyGuard {
 
     /// @inheritdoc IFarmingRange
     function harvest(uint256[] calldata _campaignIDs) external nonReentrant {
-        for (uint256 _i = 0; _i < _campaignIDs.length; ++_i) {
+        for (uint256 _i; _i != _campaignIDs.length; ) {
             _withdraw(_campaignIDs[_i], 0);
+            unchecked {
+                ++_i;
+            }
         }
     }
 
@@ -338,6 +359,18 @@ contract FarmingRange is IFarmingRange, Ownable, ReentrancyGuard {
     }
 
     /**
+     * @notice function to trick the compilator to use safeTransferFrom in try catch
+     * @param _token token to interact with
+     * @param _from address who own token
+     * @param _to address to transfer token
+     * @param _amount quantity to be transferred
+     */
+    function attemptTransfer(IERC20 _token, address _from, address _to, uint256 _amount) external {
+        require(msg.sender == address(this), "FarmingRange::attemptTransfer::Sender not farming"); // this function should be called only by this contract
+        _token.safeTransferFrom(_from, _to, _amount);
+    }
+
+    /**
      * @notice return the endblock of the phase that contains _blockNumber
      * @param _campaignID the campaign id of the phases to check
      * @param _blockNumber the block number to check
@@ -349,8 +382,13 @@ contract FarmingRange is IFarmingRange, Ownable, ReentrancyGuard {
         if (_len == 0) {
             return 0;
         }
-        for (uint256 _i = 0; _i < _len; ++_i) {
-            if (_blockNumber <= rewardInfo[_i].endBlock) return rewardInfo[_i].endBlock;
+        for (uint256 _i; _i != _len; ) {
+            if (_blockNumber <= rewardInfo[_i].endBlock) {
+                return rewardInfo[_i].endBlock;
+            }
+            unchecked {
+                ++_i;
+            }
         }
         /// @dev when couldn't find any reward info, it means that _blockNumber exceed endblock
         /// so return the latest reward info.
@@ -369,8 +407,13 @@ contract FarmingRange is IFarmingRange, Ownable, ReentrancyGuard {
         if (_len == 0) {
             return 0;
         }
-        for (uint256 _i = 0; _i < _len; ++_i) {
-            if (_blockNumber <= rewardInfo[_i].endBlock) return rewardInfo[_i].rewardPerBlock;
+        for (uint256 _i; _i != _len; ) {
+            if (_blockNumber <= rewardInfo[_i].endBlock) {
+                return rewardInfo[_i].rewardPerBlock;
+            }
+            unchecked {
+                ++_i;
+            }
         }
         /// @dev when couldn't find any reward info, it means that timestamp exceed endblock
         /// so return 0
@@ -395,7 +438,7 @@ contract FarmingRange is IFarmingRange, Ownable, ReentrancyGuard {
         RewardInfo[] storage rewardInfo,
         CampaignInfo storage campaign,
         RewardInfo storage selectedRewardInfo
-    ) internal returns (bool refund_, uint256 diff_) {
+    ) internal virtual returns (bool refund_, uint256 diff_) {
         uint256 _previousStartBlock = _rewardIndex == 0 ? campaign.startBlock : rewardInfo[_rewardIndex - 1].endBlock;
         uint256 _newStartBlock = block.number > _previousStartBlock ? block.number : _previousStartBlock;
         uint256 _previousBlockRange = selectedRewardInfo.endBlock - _previousStartBlock;
@@ -415,15 +458,15 @@ contract FarmingRange is IFarmingRange, Ownable, ReentrancyGuard {
 
     /**
      * @notice transfer tokens from rewardManger to this contract.
-     * @param _rewardToken to reward token to be transfered from the rewwardmanager to this contract
-     * @param _amount qty to be transfered
+     * @param _rewardToken to reward token to be transferred from the rewardManager to this contract
+     * @param _amount qty to be transferred
      * @param _campaignID id of the campaign so the rewardManager can fetch the rewardToken address to transfer
      *
      * @dev in case of fail, not enough allowance is considered to be the reason, so we call resetAllowance(uint256) on
      * the reward manager (which will reset allowance to uint256.max) and we try again to transfer
      */
     function _transferFromWithAllowance(IERC20 _rewardToken, uint256 _amount, uint256 _campaignID) internal {
-        try _rewardToken.transferFrom(rewardManager, address(this), _amount) {} catch {
+        try this.attemptTransfer(_rewardToken, rewardManager, address(this), _amount) {} catch {
             rewardManager.call(abi.encodeWithSignature("resetAllowance(uint256)", _campaignID));
             _rewardToken.safeTransferFrom(rewardManager, address(this), _amount);
         }
@@ -436,19 +479,28 @@ contract FarmingRange is IFarmingRange, Ownable, ReentrancyGuard {
      * @param _rewardDebt user info rewardDebt
      * @return pending rewards
      */
-    function _pendingReward(uint256 _campaignID, uint256 _amount, uint256 _rewardDebt) internal view returns (uint256) {
+    function _pendingReward(
+        uint256 _campaignID,
+        uint256 _amount,
+        uint256 _rewardDebt
+    ) internal view virtual returns (uint256) {
         CampaignInfo memory _campaign = campaignInfo[_campaignID];
         RewardInfo[] memory _rewardInfo = campaignRewardInfo[_campaignID];
         uint256 _accRewardPerShare = _campaign.accRewardPerShare;
+
         if (block.number > _campaign.lastRewardBlock && _campaign.totalStaked != 0) {
             uint256 _cursor = _campaign.lastRewardBlock;
-            for (uint256 _i = 0; _i < _rewardInfo.length; ++_i) {
+            for (uint256 _i; _i != _rewardInfo.length; ) {
                 uint256 _multiplier = getMultiplier(_cursor, block.number, _rewardInfo[_i].endBlock);
-                if (_multiplier == 0) continue;
-                _cursor = _rewardInfo[_i].endBlock;
-                _accRewardPerShare =
-                    _accRewardPerShare +
-                    ((_multiplier * _rewardInfo[_i].rewardPerBlock * 1e20) / _campaign.totalStaked);
+                if (_multiplier != 0) {
+                    _cursor = _rewardInfo[_i].endBlock;
+                    _accRewardPerShare =
+                        _accRewardPerShare +
+                        ((_multiplier * _rewardInfo[_i].rewardPerBlock * 1e20) / _campaign.totalStaked);
+                }
+                unchecked {
+                    ++_i;
+                }
             }
         }
         return ((_amount * _accRewardPerShare) / 1e20) - _rewardDebt;
@@ -456,41 +508,63 @@ contract FarmingRange is IFarmingRange, Ownable, ReentrancyGuard {
 
     /**
      * @notice Update reward variables of the given campaign to be up-to-date.
+     *         NOTE: All rewards relating to periods devoid of any depositors are sent back to the reward manager.
      * @param _campaignID campaign id
      */
-    function _updateCampaign(uint256 _campaignID) internal {
+    function _updateCampaign(uint256 _campaignID) internal virtual {
+        require(campaignInfo.length > _campaignID, "FarmingRange::_updateCampaign::Campaign id not valid");
         CampaignInfo storage campaign = campaignInfo[_campaignID];
         RewardInfo[] memory _rewardInfo = campaignRewardInfo[_campaignID];
         if (block.number <= campaign.lastRewardBlock) {
             return;
         }
         if (campaign.totalStaked == 0) {
-            // if there is no total supply, return and use the campaign's start block as the last reward block
-            // so that ALL reward will be distributed.
-            // however, if the first deposit is out of reward period, last reward block will be its block number
-            // in order to keep the multiplier = 0
-            if (block.number > _endBlockOf(_campaignID, block.number)) {
-                campaign.lastRewardBlock = block.number;
+            uint256 _amount;
+            for (uint256 _i; _i != _rewardInfo.length; ) {
+                if (_rewardInfo[_i].endBlock >= campaign.lastRewardBlock) {
+                    uint256 _startBlock = _i != 0 ? _rewardInfo[_i - 1].endBlock : campaign.lastRewardBlock;
+                    bool _lastRewardInfo = _rewardInfo[_i].endBlock > block.number;
+                    uint256 _blockRange = (_lastRewardInfo ? block.number : _rewardInfo[_i].endBlock) -
+                        (_startBlock > campaign.lastRewardBlock ? _startBlock : campaign.lastRewardBlock);
+                    _amount += _rewardInfo[_i].rewardPerBlock * _blockRange;
+                    if (_lastRewardInfo) {
+                        break;
+                    }
+                }
+                unchecked {
+                    ++_i;
+                }
             }
+
+            if (_amount != 0) {
+                campaign.rewardToken.safeTransfer(rewardManager, _amount);
+            }
+
+            campaign.lastRewardBlock = block.number;
+
             return;
         }
         /// @dev for each reward info
-        for (uint256 _i = 0; _i < _rewardInfo.length; ++_i) {
+        for (uint256 _i; _i != _rewardInfo.length; ) {
             // @dev get multiplier based on current Block and rewardInfo's end block
             // multiplier will be a range of either (current block - campaign.lastRewardBlock)
             // or (reward info's endblock - campaign.lastRewardBlock) or 0
             uint256 _multiplier = getMultiplier(campaign.lastRewardBlock, block.number, _rewardInfo[_i].endBlock);
-            if (_multiplier == 0) continue;
-            // @dev if currentBlock exceed end block, use end block as the last reward block
-            // so that for the next iteration, previous endBlock will be used as the last reward block
-            if (block.number > _rewardInfo[_i].endBlock) {
-                campaign.lastRewardBlock = _rewardInfo[_i].endBlock;
-            } else {
-                campaign.lastRewardBlock = block.number;
+            if (_multiplier != 0) {
+                // @dev if currentBlock exceed end block, use end block as the last reward block
+                // so that for the next iteration, previous endBlock will be used as the last reward block
+                if (block.number > _rewardInfo[_i].endBlock) {
+                    campaign.lastRewardBlock = _rewardInfo[_i].endBlock;
+                } else {
+                    campaign.lastRewardBlock = block.number;
+                }
+                campaign.accRewardPerShare =
+                    campaign.accRewardPerShare +
+                    ((_multiplier * _rewardInfo[_i].rewardPerBlock * 1e20) / campaign.totalStaked);
             }
-            campaign.accRewardPerShare =
-                campaign.accRewardPerShare +
-                ((_multiplier * _rewardInfo[_i].rewardPerBlock * 1e20) / campaign.totalStaked);
+            unchecked {
+                ++_i;
+            }
         }
     }
 
@@ -505,13 +579,13 @@ contract FarmingRange is IFarmingRange, Ownable, ReentrancyGuard {
         require(user.amount >= _amount, "FarmingRange::withdraw::bad withdraw amount");
         _updateCampaign(_campaignID);
         uint256 _pending = (user.amount * campaign.accRewardPerShare) / 1e20 - user.rewardDebt;
-        if (_pending > 0) {
+        if (_pending != 0) {
             campaign.rewardToken.safeTransfer(msg.sender, _pending);
         }
-        if (_amount > 0) {
+        if (_amount != 0) {
             user.amount = user.amount - _amount;
-            campaign.stakingToken.safeTransfer(msg.sender, _amount);
             campaign.totalStaked = campaign.totalStaked - _amount;
+            campaign.stakingToken.safeTransfer(msg.sender, _amount);
         }
         user.rewardDebt = (user.amount * campaign.accRewardPerShare) / 1e20;
 

@@ -4,6 +4,7 @@ pragma solidity >=0.8.17;
 // interfaces
 import "../../core/interfaces/ISmardexSwapCallback.sol";
 import "../../core/interfaces/ISmardexMintCallback.sol";
+import "../../core/libraries/SmardexLibrary.sol";
 
 interface ISmardexRouter is ISmardexSwapCallback, ISmardexMintCallback {
     /**
@@ -145,7 +146,7 @@ interface ISmardexRouter is ISmardexSwapCallback, ISmardexMintCallback {
     ) external returns (uint256 amountA_, uint256 amountB_);
 
     /**
-     * @notice Removes liquidity from an ERC-20=WETTH pool and receive ETH without pre-approval
+     * @notice Removes liquidity from an ERC-20=WETH pool and receive ETH without pre-approval
      * @param _token A pool token.
      * @param _liquidity The amount of liquidity tokens to remove.
      * @param _amountTokenMin The minimum amount of token that must be received for the transaction not to revert.
@@ -300,13 +301,7 @@ interface ISmardexRouter is ISmardexSwapCallback, ISmardexMintCallback {
 
     /**
      * @notice return the amount of tokens the user would get by doing a swap
-     * @param _amountIn quantity of token the user want to swap (to sell)
-     * @param _reserveIn reserves of the selling token (getReserve())
-     * @param _reserveOut reserves of the buying token (getReserve())
-     * @param _fictiveReserveIn fictive reserve of the selling token (getFictiveReserves())
-     * @param _fictiveReserveOut fictive reserve of the buying token (getFictiveReserves())
-     * @param _priceAverageIn price average of the selling token
-     * @param _priceAverageOut price average of the buying token
+     * @param _param all the parameters required to get amount from struct GetAmountParameters
      * @return amountOut_ The amount of token the user would receive
      * @return newReserveIn_ reserves of the selling token after the swap
      * @return newReserveOut_ reserves of the buying token after the swap
@@ -314,13 +309,7 @@ interface ISmardexRouter is ISmardexSwapCallback, ISmardexMintCallback {
      * @return newFictiveReserveOut_ fictive reserve of the buying token after the swap
      */
     function getAmountOut(
-        uint256 _amountIn,
-        uint256 _reserveIn,
-        uint256 _reserveOut,
-        uint256 _fictiveReserveIn,
-        uint256 _fictiveReserveOut,
-        uint256 _priceAverageIn,
-        uint256 _priceAverageOut
+        SmardexLibrary.GetAmountParameters memory _param
     )
         external
         pure
@@ -334,13 +323,7 @@ interface ISmardexRouter is ISmardexSwapCallback, ISmardexMintCallback {
 
     /**
      * @notice return the amount of tokens the user should spend by doing a swap
-     * @param _amountOut quantity of token the user want to swap (to buy)
-     * @param _reserveIn reserves of the selling token (getReserve())
-     * @param _reserveOut reserves of the buying token (getReserve())
-     * @param _fictiveReserveIn fictive reserve of the selling token (getFictiveReserves())
-     * @param _fictiveReserveOut fictive reserve of the buying token (getFictiveReserves())
-     * @param _priceAverageIn price average of the selling token
-     * @param _priceAverageOut price average of the buying token
+     * @param _param all the parameters required to get amount from struct GetAmountParameters
      * @return amountIn_ The amount of token the user would spend to receive _amountOut
      * @return newReserveIn_ reserves of the selling token after the swap
      * @return newReserveOut_ reserves of the buying token after the swap
@@ -348,16 +331,64 @@ interface ISmardexRouter is ISmardexSwapCallback, ISmardexMintCallback {
      * @return newFictiveReserveOut_ fictive reserve of the buying token after the swap
      */
     function getAmountIn(
-        uint256 _amountOut,
-        uint256 _reserveIn,
-        uint256 _reserveOut,
-        uint256 _fictiveReserveIn,
-        uint256 _fictiveReserveOut,
-        uint256 _priceAverageIn,
-        uint256 _priceAverageOut
+        SmardexLibrary.GetAmountParameters memory _param
     )
         external
         pure
+        returns (
+            uint256 amountIn_,
+            uint256 newReserveIn_,
+            uint256 newReserveOut_,
+            uint256 newFictiveReserveIn_,
+            uint256 newFictiveReserveOut_
+        );
+
+    /**
+     * @notice return the amount of tokens the user should spend by doing a swap by directly
+     *              fetching data from the pair tokenIn/tokenOut
+     * @param _amountIn quantity of token the user want to swap (to buy)
+     * @param _tokenIn address of the token the user want to sell
+     * @param _tokenOut address of the token the user want to buy
+     * @return amountOut_ The amount of token the user would receive
+     * @return newReserveIn_ reserves of the selling token after the swap
+     * @return newReserveOut_ reserves of the buying token after the swap
+     * @return newFictiveReserveIn_ fictive reserve of the selling token after the swap
+     * @return newFictiveReserveOut_ fictive reserve of the buying token after the swap
+     */
+    function getAmountOutFromPair(
+        uint256 _amountIn,
+        address _tokenIn,
+        address _tokenOut
+    )
+        external
+        view
+        returns (
+            uint256 amountOut_,
+            uint256 newReserveIn_,
+            uint256 newReserveOut_,
+            uint256 newFictiveReserveIn_,
+            uint256 newFictiveReserveOut_
+        );
+
+    /**
+     * @notice return the amount of tokens the user should spend by doing a swap by directly
+     *              fetching data from the pair tokenIn/tokenOut
+     * @param _amountOut quantity of token the user want to swap (to sell)
+     * @param _tokenIn address of the token the user want to sell
+     * @param _tokenOut address of the token the user want to buy
+     * @return amountIn_ The amount of token the user would spend to receive _amountOut
+     * @return newReserveIn_ reserves of the selling token after the swap
+     * @return newReserveOut_ reserves of the buying token after the swap
+     * @return newFictiveReserveIn_ fictive reserve of the selling token after the swap
+     * @return newFictiveReserveOut_ fictive reserve of the buying token after the swap
+     */
+    function getAmountInFromPair(
+        uint256 _amountOut,
+        address _tokenIn,
+        address _tokenOut
+    )
+        external
+        view
         returns (
             uint256 amountIn_,
             uint256 newReserveIn_,

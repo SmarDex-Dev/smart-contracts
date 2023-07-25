@@ -75,7 +75,7 @@ export function shouldBehaveLikeWithdraw(): void {
     );
   });
 
-  it("check no tokens left after all users have withdrawn their shares ", async function () {
+  it("check still tokens left after all users have withdrawn their shares ", async function () {
     await staking.deposit(2);
     await staking.connect(user).deposit(1);
     await sdex.transfer(staking.address, parseEther("1"));
@@ -83,7 +83,7 @@ export function shouldBehaveLikeWithdraw(): void {
     expect(await sdex.balanceOf(admin.address)).to.be.eq(SMARDEX_ADMIN_BALANCE.sub(parseEther("1")).sub(2));
 
     const sharesAdmin = (await staking.userInfo(admin.address)).shares;
-    let totalShares = await staking.totalShares();
+    const totalShares = await staking.totalShares();
     expect(sharesAdmin).to.be.eq(parseShare(BigNumber.from(2)).sub(MINIMUM_SHARES));
     expect(totalShares).to.be.eq(parseShare(BigNumber.from(3)));
 
@@ -165,7 +165,7 @@ export function shouldBehaveLikeWithdraw(): void {
     expect((await staking.userInfo(user.address)).shares).to.be.eq(constants.Zero);
   });
 
-  it("Shares inflation", async function () {
+  it("Audit test - Shares inflation", async function () {
     const attBalanceBefore = await sdex.balanceOf(user.address);
     const victimBalanceBefore = await sdex.balanceOf(admin.address);
     const depositAmount = parseEther("10");

@@ -1,9 +1,11 @@
 import { parseEther } from "ethers/lib/utils";
-import { constants } from "ethers";
+import { BigNumber, constants } from "ethers";
 import { expect } from "chai";
 import { ADDRESS_DEAD, MINIMUM_LIQUIDITY, PANIC_CODE_ARITHMETIC_UNDERFLOW_OVERFLOW } from "../../constants";
 import { anyValue } from "@nomicfoundation/hardhat-chai-matchers/withArgs";
 import hre from "hardhat";
+import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
+import { unitFixtureSmardexRouter } from "../../fixtures";
 
 export function shouldBehaveLikeAddLiquidity(): void {
   it("simple test", async function () {
@@ -223,7 +225,7 @@ export function shouldBehaveLikeAddLiquidity(): void {
       this.contracts.smardexRouter.addLiquidity(
         this.contracts.token0.address,
         this.contracts.token1.address,
-        parseEther("0"),
+        constants.Zero,
         parseEther("1"),
         1,
         1,
@@ -231,5 +233,94 @@ export function shouldBehaveLikeAddLiquidity(): void {
         constants.MaxUint256,
       ),
     ).to.be.revertedWithPanic(PANIC_CODE_ARITHMETIC_UNDERFLOW_OVERFLOW);
+  });
+
+  context("When gas limit is too low to run the full transaction", function () {
+    let addLiquidityRequiredGas: BigNumber;
+
+    beforeEach("", async function () {
+      /* -------------------------------------------------------------------------- */
+      /*                        Get addLiquidity required gas                       */
+      /* -------------------------------------------------------------------------- */
+
+      // Make an addLiquidity call to get the required gas to run the full transaction
+      await this.contracts.smardexFactory.setFeeTo(this.contracts.autoSwapper.address);
+
+      // Approves pair tokens
+      await this.contracts.token0.approve(this.contracts.smardexRouter.address, constants.MaxUint256);
+      await this.contracts.token1.approve(this.contracts.smardexRouter.address, constants.MaxUint256);
+
+      // Get required gas to run the full transaction with enough gas
+
+      const addLiquidityTx = await this.contracts.smardexRouter.addLiquidity(
+        this.contracts.token0.address,
+        this.contracts.token1.address,
+        parseEther("1"),
+        parseEther("4"),
+        1,
+        1,
+        this.signers.admin.address,
+        constants.MaxUint256,
+      );
+
+      const receipt = await addLiquidityTx.wait();
+
+      // Store the required gas to run the full transaction
+      addLiquidityRequiredGas = receipt.gasUsed;
+    });
+
+    it("Call fail when the gasLimit is insufficient to fully run addLiquidity", async function () {
+      /* -------------------------------------------------------------------------- */
+      /*                               Reload fixtures                              */
+      /* -------------------------------------------------------------------------- */
+      const { token0, token1, pair } = await loadFixture(unitFixtureSmardexRouter);
+      this.contracts.token0 = token0;
+      this.contracts.token1 = token1;
+      this.contracts.smardexPair = pair;
+
+      /* -------------------------------------------------------------------------- */
+      /*                            Custom gasLimit call                            */
+      /* -------------------------------------------------------------------------- */
+
+      /* ------------------------------- Setup call ------------------------------- */
+
+      await this.contracts.smardexFactory.setFeeTo(this.contracts.autoSwapper.address);
+
+      // Approves pair tokens (new fixtures)
+      await this.contracts.token0.approve(this.contracts.smardexRouter.address, constants.MaxUint256);
+      await this.contracts.token1.approve(this.contracts.smardexRouter.address, constants.MaxUint256);
+
+      /* ------------------------------ Check revert ------------------------------ */
+
+      // Using a try catch because `.to.be.reverted` doesn't fetch
+      try {
+        // Execute call with insufficient gas to run _feeToSwap, but enough for call the rest
+
+        const res = await (
+          await this.contracts.smardexRouter.addLiquidity(
+            this.contracts.token0.address,
+            this.contracts.token1.address,
+            parseEther("1"),
+            parseEther("4"),
+            1,
+            1,
+            this.signers.admin.address,
+            constants.MaxUint256,
+            { gasLimit: addLiquidityRequiredGas.mul(95).div(100) },
+          )
+        ).wait();
+
+        console.log(res, addLiquidityRequiredGas);
+      } catch (err) {
+        expect((err as Error).toString()).to.eq(
+          "Error: Transaction reverted: contract call run out of gas and made the transaction revert",
+        );
+        expect((err as { stackTrace: string[] }).stackTrace.length).to.be.greaterThan(0);
+        return;
+      }
+
+      // Throw error if the call didn't fail as expected
+      throw new Error("Call did not failed as expected");
+    });
   });
 }

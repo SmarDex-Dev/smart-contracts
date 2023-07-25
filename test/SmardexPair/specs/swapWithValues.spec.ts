@@ -180,7 +180,7 @@ export function shouldBehaveLikeSwapWithValues(): void {
     isFeeToSet: boolean,
     isSwapToken0ToToken1: boolean,
   ) {
-    const fees = await contracts.smardexPairTest.getFees();
+    const fees = await contracts.smardexPairTest.getFeeToAmounts();
     const reserves = await contracts.smardexPairTest.getReserves();
     const balancePairToken0 = await contracts.token0.balanceOf(contracts.smardexPairTest.address);
     const balancePairToken1 = await contracts.token1.balanceOf(contracts.smardexPairTest.address);
