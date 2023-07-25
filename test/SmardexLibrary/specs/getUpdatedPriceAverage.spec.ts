@@ -15,7 +15,7 @@ export function shouldBehaveLikeGetUpdatedPriceAverage(): void {
     const [priceAvIn, priceAvOut] = await this.contracts.smardexLibraryTest.getUpdatedPriceAverage(
       RES_FIC_IN,
       RES_FIC_OUT,
-      0,
+      "0",
       OLD_PRICE_AV_IN,
       OLD_PRICE_AV_OUT,
       TIMESTAMP_2023,

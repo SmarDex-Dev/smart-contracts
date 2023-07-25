@@ -1,13 +1,19 @@
 import { BigNumber, Signer } from "ethers";
-import { ethers } from "hardhat";
+import { ethers, network } from "hardhat";
 import {
+  ArbSysCoreTest,
   AutoSwapper,
+  AutoSwapperL2,
   CallbackTest,
   CheckBlockTest,
   DoubleSwapRouter,
   ERC20Test,
+  FakeERC20reentrancy,
   FarmingRange,
-  RewardManager,
+  FarmingRangeL2Arbitrum,
+  RewardManagerTest,
+  RewardManagerTestL2,
+  RewardManagerTestL2Arbitrum,
   RouterEventEmitter,
   RouterForPairTest,
   SmardexFactory,
@@ -19,8 +25,12 @@ import {
   SmardexRouterTest,
   SmardexTokenTest,
   Staking,
+  TetherToken,
   WETH9,
 } from "../typechain";
+import { parseEther } from "ethers/lib/utils";
+
+import { ADDRESS_100, FEES_LP, FEES_POOL } from "./constants";
 
 export async function deployOrderedPairOfERC20(totalSupply: BigNumber): Promise<[ERC20Test, ERC20Test]> {
   const token0 = await deployERC20Test(totalSupply);
@@ -41,18 +51,20 @@ export async function deployERC20Test(total_supply: BigNumber): Promise<ERC20Tes
   return erc20;
 }
 
-export async function deploySmardexFactory(feeToSetter: string): Promise<SmardexFactory> {
-  const contractFactory = await ethers.getContractFactory("SmardexFactory", {});
-  const smardexFactory = await contractFactory.deploy(feeToSetter);
+export async function deploySmardexFactory(): Promise<SmardexFactory> {
+  const contractFactory = await ethers.getContractFactory("SmardexFactory");
+  const smardexFactory = await contractFactory.deploy();
   await smardexFactory.deployed();
+  await smardexFactory.setFees(FEES_LP, FEES_POOL);
 
   return smardexFactory;
 }
 
-export async function deploySmardexFactoryTest(feeToSetter: string): Promise<SmardexFactoryTest> {
+export async function deploySmardexFactoryTest(): Promise<SmardexFactoryTest> {
   const contractFactoryTest = await ethers.getContractFactory("SmardexFactoryTest", {});
-  const smardexFactoryTest = await contractFactoryTest.deploy(feeToSetter);
+  const smardexFactoryTest = await contractFactoryTest.deploy();
   await smardexFactoryTest.deployed();
+  await smardexFactoryTest.setFees(FEES_LP, FEES_POOL);
 
   return smardexFactoryTest;
 }
@@ -73,7 +85,6 @@ export async function deploySmardexPair(
   await smardexFactory.createPair(token0.address, token1.address);
   const smardexPairAddress = await smardexFactory.getPair(token0.address, token1.address);
   const contractPair = await ethers.getContractFactory("SmardexPair", {});
-
   return contractPair.attach(smardexPairAddress);
 }
 
@@ -137,26 +148,31 @@ export async function deployFarmingRange(deployer: Signer): Promise<FarmingRange
   return farmingRange;
 }
 
-export async function deployStaking(smardexTokenAddress: string, farmingAddress: string): Promise<Staking> {
-  const contractStaking = await ethers.getContractFactory("Staking", {});
-  const Staking = await contractStaking.deploy(smardexTokenAddress, farmingAddress);
-  await Staking.deployed();
+async function deployArbSysCore(): Promise<ArbSysCoreTest> {
+  const factory = await ethers.getContractFactory("ArbSysCoreTest");
+  const currentCode = await network.provider.send("eth_getCode", [ADDRESS_100]);
 
-  return Staking;
+  if (currentCode.length <= 2) {
+    const arbSysCoreTest = await factory.deploy();
+    await arbSysCoreTest.deployed();
+    const arbSysCoreCode = await network.provider.send("eth_getCode", [arbSysCoreTest.address]);
+
+    await network.provider.send("hardhat_setCode", [ADDRESS_100, arbSysCoreCode]);
+  }
+
+  return factory.attach(ADDRESS_100);
 }
 
-export async function deployCheckBlockTest(
-  stakingAddress: string,
-  smardexTokenAddress: string,
-): Promise<CheckBlockTest> {
-  const factory = await ethers.getContractFactory("CheckBlockTest", {});
-  const checkBlockTest = await factory.deploy(stakingAddress, smardexTokenAddress);
-  await checkBlockTest.deployed();
+export async function deployFarmingRangeL2Arbitrum(deployer: Signer): Promise<FarmingRangeL2Arbitrum> {
+  await deployArbSysCore();
+  const factory = await ethers.getContractFactory("FarmingRangeL2Arbitrum");
+  const farmingRangeArbitrum = await factory.deploy(await deployer.getAddress());
+  await farmingRangeArbitrum.deployed();
 
-  return checkBlockTest;
+  return farmingRangeArbitrum;
 }
 
-export async function deployAutoSwapper(
+export async function deployAutoSwapperL1(
   factoryAddress: string,
   sdexTokenAddress: string,
   stakingContractAddress: string,
@@ -168,13 +184,40 @@ export async function deployAutoSwapper(
   return autoSwapper;
 }
 
-export async function deployRewardManager(
+export async function deployAutoSwapperL2(factoryAddress: string, sdexTokenAddress: string): Promise<AutoSwapperL2> {
+  const factory = await ethers.getContractFactory("AutoSwapperL2");
+  const autoSwapper = await factory.deploy(factoryAddress, sdexTokenAddress);
+  await autoSwapper.deployed();
+
+  return autoSwapper;
+}
+
+export async function deployRewardManagerTest(
   farmingOwner: Signer,
   smardexTokenAddress: string,
-  campaignBlock: BigNumber,
-): Promise<RewardManager> {
-  const factory = await ethers.getContractFactory("RewardManager");
+  campaignBlock: number,
+): Promise<RewardManagerTest> {
+  const factory = await ethers.getContractFactory("RewardManagerTest");
+
   const rewardManager = await factory.deploy(await farmingOwner.getAddress(), smardexTokenAddress, campaignBlock);
+
+  await rewardManager.deployed();
+
+  return rewardManager;
+}
+
+export async function deployRewardManagerTestL2(farmingOwner: Signer): Promise<RewardManagerTestL2> {
+  const factory = await ethers.getContractFactory("RewardManagerTestL2");
+  const rewardManager = await factory.deploy(await farmingOwner.getAddress());
+  await rewardManager.deployed();
+
+  return rewardManager;
+}
+
+export async function deployRewardManagerTestL2Arbitrum(farmingOwner: Signer): Promise<RewardManagerTestL2Arbitrum> {
+  await deployArbSysCore();
+  const factory = await ethers.getContractFactory("RewardManagerTestL2Arbitrum");
+  const rewardManager = await factory.deploy(await farmingOwner.getAddress());
   await rewardManager.deployed();
 
   return rewardManager;
@@ -204,10 +247,40 @@ export async function deployRouterForPairTest(smardexFactory: SmardexFactory, WE
   return routerForPairTest;
 }
 
-export async function deployFakeERC20reentrancy(smardexFactory: SmardexFactory, WETH: WETH9) {
+export async function deployFakeERC20reentrancy(
+  smardexFactory: SmardexFactory,
+  WETH: WETH9,
+): Promise<FakeERC20reentrancy> {
   const factory = await ethers.getContractFactory("FakeERC20reentrancy");
   const fakeERC20contract = await factory.deploy(smardexFactory.address, WETH.address);
   await fakeERC20contract.deployed();
 
   return fakeERC20contract;
+}
+
+export async function deployTetherToken(): Promise<TetherToken> {
+  const factory = await ethers.getContractFactory("TetherToken");
+  const tetherToken = await factory.deploy(parseEther("1000"), "Tether USD", "USDT", 6);
+  await tetherToken.deployed();
+
+  return tetherToken;
+}
+
+export async function deployCheckBlockTest(
+  stakingAddress: string,
+  smardexTokenAddress: string,
+): Promise<CheckBlockTest> {
+  const factory = await ethers.getContractFactory("CheckBlockTest", {});
+  const checkBlockTest = await factory.deploy(stakingAddress, smardexTokenAddress);
+  await checkBlockTest.deployed();
+
+  return checkBlockTest;
+}
+
+export async function deployStaking(smardexTokenAddress: string, farmingAddress: string): Promise<Staking> {
+  const contractStaking = await ethers.getContractFactory("Staking", {});
+  const Staking = await contractStaking.deploy(smardexTokenAddress, farmingAddress);
+  await Staking.deployed();
+
+  return Staking;
 }

@@ -23,16 +23,6 @@ contract SmardexRouter is ISmardexRouter {
     using SafeCast for uint256;
     using SafeCast for int256;
 
-    /**
-     * @notice : callback data for swap
-     * @param path : path of the swap, array of token addresses tightly packed
-     * @param payer : address of the payer for the swap
-     */
-    struct SwapCallbackData {
-        bytes path;
-        address payer;
-    }
-
     address public immutable factory;
     address public immutable WETH;
 
@@ -112,7 +102,7 @@ contract SmardexRouter is ISmardexRouter {
     function smardexMintCallback(MintCallbackData calldata _data) external override {
         // ensure that msg.sender is a pair
         require(msg.sender == PoolAddress.pairFor(factory, _data.token0, _data.token1), "SmarDexRouter: INVALID_PAIR");
-        require(_data.amount0 > 0 || _data.amount1 > 0, "SmardexRouter: Callback Invalid amount");
+        require(_data.amount0 != 0 || _data.amount1 != 0, "SmardexRouter: Callback Invalid amount");
 
         pay(_data.token0, _data.payer, msg.sender, _data.amount0);
         pay(_data.token1, _data.payer, msg.sender, _data.amount1);
@@ -282,7 +272,7 @@ contract SmardexRouter is ISmardexRouter {
     function swapExactTokensForTokens(
         uint256 _amountIn,
         uint256 _amountOutMin,
-        address[] memory _path,
+        address[] calldata _path,
         address _to,
         uint256 _deadline
     ) public virtual override ensure(_deadline) returns (uint256 amountOut_) {
@@ -329,8 +319,6 @@ contract SmardexRouter is ISmardexRouter {
         if (_path.length > 2) amountIn_ = amountInCached;
         require(amountIn_ <= _amountInMax, "SmarDexRouter: EXCESSIVE_INPUT_AMOUNT");
         amountInCached = DEFAULT_AMOUNT_IN_CACHED;
-
-        _refundETH(_to);
     }
 
     /// @inheritdoc ISmardexRouter
@@ -355,6 +343,9 @@ contract SmardexRouter is ISmardexRouter {
     ) external payable virtual override ensure(_deadline) returns (uint256 amountIn_) {
         require(_path[0] == WETH, "SmarDexRouter: INVALID_PATH");
         amountIn_ = swapTokensForExactTokens(_amountOut, msg.value, _path, _to, _deadline);
+
+        // Refund unused ETH
+        _refundETH(msg.sender);
     }
 
     /// @inheritdoc ISmardexRouter
@@ -393,7 +384,7 @@ contract SmardexRouter is ISmardexRouter {
         uint256 _balanceWETH = IERC20(WETH).balanceOf(address(this));
         require(_balanceWETH >= _amountMinimum, "Insufficient WETH");
 
-        if (_balanceWETH > 0) {
+        if (_balanceWETH != 0) {
             IWETH(WETH).withdraw(_balanceWETH);
             TransferHelper.safeTransferETH(_to, _balanceWETH);
         }
@@ -407,7 +398,7 @@ contract SmardexRouter is ISmardexRouter {
      * @custom:url https://github.com/Uniswap/v3-periphery/blob/v1.3.0/contracts/base/PeripheryPayments.sol
      */
     function _refundETH(address _to) private {
-        if (address(this).balance > 0) {
+        if (address(this).balance != 0) {
             TransferHelper.safeTransferETH(_to, address(this).balance);
         }
     }
@@ -424,10 +415,7 @@ contract SmardexRouter is ISmardexRouter {
         address _to,
         SwapCallbackData memory _data
     ) private returns (uint256 amountIn_) {
-        // allow swapping to the router address with address 0
-        if (_to == address(0)) {
-            _to = address(this);
-        }
+        require(_to != address(0), "SmarDexRouter: INVALID_RECIPIENT");
 
         (address _tokenOut, address _tokenIn) = _data.path.decodeFirstPool();
         bool _zeroForOne = _tokenIn < _tokenOut;
@@ -527,13 +515,7 @@ contract SmardexRouter is ISmardexRouter {
 
     /// @inheritdoc ISmardexRouter
     function getAmountOut(
-        uint256 _amountIn,
-        uint256 _reserveIn,
-        uint256 _reserveOut,
-        uint256 _fictiveReserveIn,
-        uint256 _fictiveReserveOut,
-        uint256 _priceAverageIn,
-        uint256 _priceAverageOut
+        SmardexLibrary.GetAmountParameters memory _param
     )
         external
         pure
@@ -545,27 +527,17 @@ contract SmardexRouter is ISmardexRouter {
             uint256 newFictiveReserveOut_
         )
     {
+        /// @dev The values _priceAverageIn and _priceAverageOut are not directly fetched from the pair,
+        ///      and therefore, they may not necessarily be up to date with the most recent data. In
+        ///      order to yield a _amountOut that represents the most current value, it is crucial that
+        ///      the args _priceAverageIn and _priceAverageOut reflects the latest, updated data.
         (amountOut_, newReserveIn_, newReserveOut_, newFictiveReserveIn_, newFictiveReserveOut_) = SmardexLibrary
-            .getAmountOut(
-                _amountIn,
-                _reserveIn,
-                _reserveOut,
-                _fictiveReserveIn,
-                _fictiveReserveOut,
-                _priceAverageIn,
-                _priceAverageOut
-            );
+            .getAmountOut(_param);
     }
 
     /// @inheritdoc ISmardexRouter
     function getAmountIn(
-        uint256 _amountOut,
-        uint256 _reserveIn,
-        uint256 _reserveOut,
-        uint256 _fictiveReserveIn,
-        uint256 _fictiveReserveOut,
-        uint256 _priceAverageIn,
-        uint256 _priceAverageOut
+        SmardexLibrary.GetAmountParameters memory _param
     )
         external
         pure
@@ -578,14 +550,108 @@ contract SmardexRouter is ISmardexRouter {
         )
     {
         (amountIn_, newReserveIn_, newReserveOut_, newFictiveReserveIn_, newFictiveReserveOut_) = SmardexLibrary
-            .getAmountIn(
-                _amountOut,
-                _reserveIn,
-                _reserveOut,
-                _fictiveReserveIn,
-                _fictiveReserveOut,
-                _priceAverageIn,
-                _priceAverageOut
-            );
+            .getAmountIn(_param);
+    }
+
+    /// @inheritdoc ISmardexRouter
+    function getAmountOutFromPair(
+        uint256 _amountIn,
+        address _tokenIn,
+        address _tokenOut
+    )
+        external
+        view
+        returns (
+            uint256 amountOut_,
+            uint256 newReserveIn_,
+            uint256 newReserveOut_,
+            uint256 newFictiveReserveIn_,
+            uint256 newFictiveReserveOut_
+        )
+    {
+        SmardexLibrary.GetAmountParameters memory _param;
+        _param.amount = _amountIn;
+
+        ISmardexPair _pair = ISmardexPair(ISmardexFactory(factory).getPair(_tokenIn, _tokenOut));
+        require(address(_pair) != address(0), "SmarDexRouter: INVALID_TOKENS");
+        uint256 _priceAverageLastTimestamp;
+
+        // fetch data
+        if (_tokenIn == _pair.token0()) {
+            (_param.reserveIn, _param.reserveOut) = _pair.getReserves();
+            (_param.fictiveReserveIn, _param.fictiveReserveOut) = _pair.getFictiveReserves();
+            (_param.priceAverageIn, _param.priceAverageOut, _priceAverageLastTimestamp) = _pair.getPriceAverage();
+        } else {
+            (_param.reserveOut, _param.reserveIn) = _pair.getReserves();
+            (_param.fictiveReserveOut, _param.fictiveReserveIn) = _pair.getFictiveReserves();
+            (_param.priceAverageOut, _param.priceAverageIn, _priceAverageLastTimestamp) = _pair.getPriceAverage();
+        }
+
+        // update price average
+        (_param.priceAverageIn, _param.priceAverageOut) = _pair.getUpdatedPriceAverage(
+            _param.fictiveReserveIn,
+            _param.fictiveReserveOut,
+            _priceAverageLastTimestamp,
+            _param.priceAverageIn,
+            _param.priceAverageOut,
+            block.timestamp
+        );
+
+        // get pair fees
+        (_param.feesLP, _param.feesPool) = _pair.getPairFees();
+
+        (amountOut_, newReserveIn_, newReserveOut_, newFictiveReserveIn_, newFictiveReserveOut_) = SmardexLibrary
+            .getAmountOut(_param);
+    }
+
+    /// @inheritdoc ISmardexRouter
+    function getAmountInFromPair(
+        uint256 _amountOut,
+        address _tokenIn,
+        address _tokenOut
+    )
+        external
+        view
+        returns (
+            uint256 amountIn_,
+            uint256 newReserveIn_,
+            uint256 newReserveOut_,
+            uint256 newFictiveReserveIn_,
+            uint256 newFictiveReserveOut_
+        )
+    {
+        SmardexLibrary.GetAmountParameters memory _param;
+        _param.amount = _amountOut;
+
+        ISmardexPair _pair = ISmardexPair(ISmardexFactory(factory).getPair(_tokenIn, _tokenOut));
+        require(address(_pair) != address(0), "SmarDexRouter: INVALID_TOKENS");
+        uint256 _priceAverageLastTimestamp;
+
+        // fetch data
+        if (_tokenIn == _pair.token0()) {
+            (_param.reserveIn, _param.reserveOut) = _pair.getReserves();
+            (_param.fictiveReserveIn, _param.fictiveReserveOut) = _pair.getFictiveReserves();
+            (_param.priceAverageIn, _param.priceAverageOut, _priceAverageLastTimestamp) = _pair.getPriceAverage();
+        } else {
+            (_param.reserveOut, _param.reserveIn) = _pair.getReserves();
+            (_param.fictiveReserveOut, _param.fictiveReserveIn) = _pair.getFictiveReserves();
+            (_param.priceAverageOut, _param.priceAverageIn, _priceAverageLastTimestamp) = _pair.getPriceAverage();
+        }
+
+        // update price average
+        (_param.priceAverageIn, _param.priceAverageOut) = _pair.getUpdatedPriceAverage(
+            _param.fictiveReserveIn,
+            _param.fictiveReserveOut,
+            _priceAverageLastTimestamp,
+            _param.priceAverageIn,
+            _param.priceAverageOut,
+            block.timestamp
+        );
+
+        // get pair fees
+        (_param.feesLP, _param.feesPool) = _pair.getPairFees();
+
+        (amountIn_, newReserveIn_, newReserveOut_, newFictiveReserveIn_, newFictiveReserveOut_) = SmardexLibrary
+            .getAmountIn(_param);
     }
 }

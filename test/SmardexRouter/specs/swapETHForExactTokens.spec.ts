@@ -74,4 +74,24 @@ export function shouldBehaveLikeSwapETHForExactTokens(): void {
       ),
     ).to.be.revertedWith("SmarDexRouter: INVALID_PATH");
   });
+
+  it("Should refund the unused ETH", async function () {
+    const balAdminBefore = await this.signers.admin.getBalance();
+
+    const routerAsAdmin = this.contracts.smardexRouter.connect(this.signers.admin);
+    await routerAsAdmin.swapETHForExactTokens(
+      outputAmount,
+      [this.contracts.WETH.address, this.contracts.WETHPartner.address],
+      this.signers.admin.address,
+      constants.MaxUint256,
+      {
+        value: expectedSwapAmount.add(parseEther("1")), // send 1 extra ETH
+      },
+    );
+
+    const balAdminAfter = await this.signers.admin.getBalance();
+
+    // Balance should be decreased by the expectedSwapAmount + the fees
+    expect(balAdminBefore.sub(balAdminAfter)).to.be.approximately(expectedSwapAmount, parseEther("0.001"));
+  });
 }

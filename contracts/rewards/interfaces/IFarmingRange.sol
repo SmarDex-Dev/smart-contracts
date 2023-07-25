@@ -124,18 +124,6 @@ interface IFarmingRange {
     event SetRewardInfoLimit(uint256 rewardInfoLimit);
 
     /**
-     * @notice emitted when the rewardManager is changed
-     * @param rewardManager address of the new rewardManager
-     */
-    event SetRewardManager(address rewardManager);
-
-    /**
-     * @notice set the reward manager, responsible for adding rewards
-     * @param _rewardManager address of the reward manager
-     */
-    function setRewardManager(address _rewardManager) external;
-
-    /**
      * @notice set new reward info limit, defining how many phases are allowed
      * @param _updatedRewardInfoLimit new reward info limit
      */
@@ -151,7 +139,7 @@ interface IFarmingRange {
     function addCampaignInfo(IERC20 _stakingToken, IERC20 _rewardToken, uint256 _startBlock) external;
 
     /**
-     * @notice add a nex reward info, when a new reward info is added, the reward
+     * @notice add a new reward info, when a new reward info is added, the reward
      * & its end block will be extended by the newly pushed reward info.
      * @param _campaignID id of the campaign
      * @param _endBlock end block of this reward info

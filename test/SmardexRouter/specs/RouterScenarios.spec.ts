@@ -611,7 +611,12 @@ export function shouldBehaveLikeRouterScenarios() {
       this.contracts.WETH,
     );
     const pairBalanceWETHAfter2 = await this.contracts.WETH.balanceOf(ethPair);
-    expect(balAdminAfter.ETH).to.be.approximately(balAdminBefore.ETH.sub(secondValueETH), parseEther("0.001"));
+
+    // we expect that ETH balance after is decreased by 10 ETH - 7.859 ETH because thay are refunded
+    const expectedBalance = balAdminBefore.ETH.sub(secondValueETH).add(
+      secondValueETH.sub(pairBalanceWETHAfter2.sub(pairBalanceWETHAfter)),
+    );
+    expect(balAdminAfter.ETH).to.be.approximately(expectedBalance, parseEther("0.001"));
 
     const balAfter3 = await getUserBalances(
       this.signers.user,
@@ -620,13 +625,11 @@ export function shouldBehaveLikeRouterScenarios() {
       this.contracts.WETHPartner,
       this.contracts.WETH,
     );
+
     // we expect that weth balance is not changed because we use ETH wrapped in contract
     expect(balAfter3.WETH).to.eq(balAfter2.WETH);
     expect(balAfter3.token1.sub(balAfter2.token1)).to.eq(parseEther("1"));
-    expect(balAfter3.ETH.sub(balAfter2.ETH)).to.be.approximately(
-      secondValueETH.sub(pairBalanceWETHAfter2.sub(pairBalanceWETHAfter)),
-      parseEther("0.001"),
-    );
+    expect(balAfter3.ETH.sub(balAfter2.ETH)).to.be.eq(0);
 
     await this.contracts.smardexRouter.swapTokensForExactETH(
       parseEther("1"),

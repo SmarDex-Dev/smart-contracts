@@ -21,42 +21,6 @@ contract AutoSwapper is IAutoSwapper {
     using SafeCast for int256;
     using Path for bytes;
 
-    /**
-     * @notice callback data for swap from SmardexRouter
-     * @param path path of the swap, array of token addresses tightly packed
-     * @param payer address of the payer for the swap
-     */
-    struct SwapCallbackData {
-        bytes path;
-        address payer;
-    }
-
-    /**
-     * @notice swap parameters used by function _swapAndSend
-     * @param zeroForOne true if we swap the token0 with token1, false otherwise
-     * @param balanceIn balance of in-token to be swapped
-     * @param pair pair address
-     * @param fictiveReserve0 fictive reserve of token0 of the pair
-     * @param fictiveReserve1 fictive reserve of token1 of the pair
-     * @param oldPriceAv0 priceAverage of token0 of the pair before the swap
-     * @param oldPriceAv1 priceAverage of token1 of the pair before the swap
-     * @param oldPriceAvTimestamp priceAverageLastTimestamp of the pair before the swap
-     * @param newPriceAvIn priceAverage of token0 of the pair after the swap
-     * @param newPriceAvOut priceAverage of token1 of the pair after the swap
-     */
-    struct SwapCallParams {
-        bool zeroForOne;
-        uint256 balanceIn;
-        ISmardexPair pair;
-        uint256 fictiveReserve0;
-        uint256 fictiveReserve1;
-        uint256 oldPriceAv0;
-        uint256 oldPriceAv1;
-        uint256 oldPriceAvTimestamp;
-        uint256 newPriceAvIn;
-        uint256 newPriceAvOut;
-    }
-
     bytes4 private constant SWAP_SELECTOR = bytes4(keccak256(bytes("swap(address,bool,int256,bytes)")));
     uint256 private constant AUTOSWAP_SLIPPAGE = 2; // 2%
     uint256 private constant AUTOSWAP_SLIPPAGE_BASE = 100;
@@ -69,6 +33,10 @@ contract AutoSwapper is IAutoSwapper {
     ISmardexPair private cachedPair = DEFAULT_CACHED_PAIR;
 
     constructor(ISmardexFactory _factory, IERC20 _smardexToken, address _stakingAddress) {
+        require(address(_factory) != address(0), "AutoSwapper: INVALID_FACTORY_ADDRESS");
+        require(address(_smardexToken) != address(0), "AutoSwapper: INVALID_SDEX_ADDRESS");
+        require(_stakingAddress != address(0), "AutoSwapper: INVALID_STAKING_ADDRESS");
+
         factory = _factory;
         smardexToken = _smardexToken;
         stakingAddress = _stakingAddress;
@@ -76,24 +44,30 @@ contract AutoSwapper is IAutoSwapper {
 
     /// @inheritdoc IAutoSwapper
     function executeWork(IERC20 _token0, IERC20 _token1) external {
-        _swapAndSend(_token0);
-        _swapAndSend(_token1);
-        transferTokens();
+        uint256 _amount0 = _swapAndSend(_token0);
+        uint256 _amount1 = _swapAndSend(_token1);
+        uint256 _transferredAmount = transferTokens();
+
+        emit workExecuted(_token0, _amount0, _token1, _amount1, _transferredAmount);
     }
 
     /// @inheritdoc IAutoSwapper
-    function transferTokens() public {
-        uint256 _balance = smardexToken.balanceOf(address(this));
-        if (_balance == 0) return;
-        smardexToken.safeTransfer(stakingAddress, _balance);
+    function transferTokens() public returns (uint256 _amount) {
+        _amount = smardexToken.balanceOf(address(this));
+        if (_amount != 0) {
+            smardexToken.safeTransfer(stakingAddress, _amount);
+        }
     }
 
     /**
      * @notice private function to swap token in SDEX and send it to the staking address
      * @param _token address of the token to swap into sdex
+     * @return amount of input tokens swapped
      */
-    function _swapAndSend(IERC20 _token) private {
-        if (_token == smardexToken) return;
+    function _swapAndSend(IERC20 _token) private returns (uint256) {
+        if (_token == smardexToken) {
+            return 0;
+        }
         SwapCallParams memory _params = SwapCallParams({
             zeroForOne: _token < smardexToken,
             balanceIn: _token.balanceOf(address(this)),
@@ -108,7 +82,9 @@ contract AutoSwapper is IAutoSwapper {
         });
 
         // basic check on input data
-        if (_params.balanceIn == 0 || address(_params.pair) == address(0)) return;
+        if (_params.balanceIn == 0 || address(_params.pair) == address(0)) {
+            return 0;
+        }
 
         // get reserves and pricesAv
         (_params.fictiveReserve0, _params.fictiveReserve1) = _params.pair.getFictiveReserves();
@@ -142,12 +118,12 @@ contract AutoSwapper is IAutoSwapper {
         uint256 _amountOutWithSlippage = (_params.balanceIn *
             _params.newPriceAvOut *
             (AUTOSWAP_SLIPPAGE_BASE - AUTOSWAP_SLIPPAGE)) / (_params.newPriceAvIn * AUTOSWAP_SLIPPAGE_BASE);
-        require(_amountOutWithSlippage > 0, "AutoSwapper: slippage calculation failed");
+        require(_amountOutWithSlippage != 0, "AutoSwapper: slippage calculation failed");
 
         cachedPair = _params.pair;
 
         // we dont check for success as we dont want to revert the whole tx if the swap fails
-        address(_params.pair).call(
+        (bool success, ) = address(_params.pair).call(
             abi.encodeWithSelector(
                 SWAP_SELECTOR,
                 stakingAddress,
@@ -161,6 +137,8 @@ contract AutoSwapper is IAutoSwapper {
         );
 
         cachedPair = DEFAULT_CACHED_PAIR;
+
+        return success ? _params.balanceIn : 0;
     }
 
     /// @inheritdoc ISmardexSwapCallback

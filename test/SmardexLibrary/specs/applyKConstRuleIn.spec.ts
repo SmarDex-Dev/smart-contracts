@@ -1,6 +1,6 @@
 import { parseEther } from "ethers/lib/utils";
 import { expect } from "chai";
-import { FEES_BASE, FEES_LP, FEES_TOTAL_REVERSED } from "../../constants";
+import { FEES_BASE, FEES_LP, FEES_POOL, FEES_TOTAL_REVERSED } from "../../constants";
 
 export function shouldBehaveLikeApplyKConstRuleIn(): void {
   it("with logic", async function () {
@@ -22,6 +22,8 @@ export function shouldBehaveLikeApplyKConstRuleIn(): void {
       reserveOut,
       fictiveReserveIn,
       fictiveReserveOut,
+      FEES_LP,
+      FEES_POOL,
     );
     expect(computedAmountIn).to.be.eq(result[0]);
     expect(reserveIn.add(amountInWithFeeLp)).to.be.eq(result[1]);

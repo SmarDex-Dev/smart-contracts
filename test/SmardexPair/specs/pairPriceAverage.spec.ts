@@ -1,6 +1,6 @@
 import { expect } from "chai";
 import { parseEther } from "ethers/lib/utils";
-import { MAX_BLOCK_DIFF_SECONDS } from "../../constants";
+import { MAX_BLOCK_DIFF_SECONDS, FEES_LP, FEES_POOL } from "../../constants";
 import hre from "hardhat";
 import { BigNumber, constants } from "ethers";
 
@@ -142,6 +142,7 @@ export function shouldBehaveLikeSmardexPairPriceAverage(): void {
       expect(pAv.priceAverage1_).to.be.eq(priceAvgAfter10minAndSwap.priceAverageOut_);
     });
     it("Price after 1 swap half reserve", async function () {
+      await this.contracts.smardexPair.setFees(FEES_LP, FEES_POOL);
       //add liquidity to pair
       await this.contracts.token0.approve(this.contracts.smardexRouterTest.address, parseEther("100000"));
       await this.contracts.token1.approve(this.contracts.smardexRouterTest.address, parseEther("100000"));

@@ -7,8 +7,32 @@ import "@openzeppelin/contracts/token/ERC20/extensions/draft-IERC20Permit.sol";
 
 interface ISmardexPair is IERC20, IERC20Permit {
     /**
+     * @notice swap parameters used by function swap
+     * @param amountCalculated return amount from getAmountIn/Out is always positive but to avoid too much cast, is int
+     * @param fictiveReserveIn fictive reserve of the in-token of the pair
+     * @param fictiveReserveOut fictive reserve of the out-token of the pair
+     * @param priceAverageIn in-token ratio component of the price average
+     * @param priceAverageOut out-token ratio component of the price average
+     * @param token0 address of the token0
+     * @param token1 address of the token1
+     * @param balanceIn contract balance of the in-token
+     * @param balanceOut contract balance of the out-token
+     */
+    struct SwapParams {
+        int256 amountCalculated;
+        uint256 fictiveReserveIn;
+        uint256 fictiveReserveOut;
+        uint256 priceAverageIn;
+        uint256 priceAverageOut;
+        address token0;
+        address token1;
+        uint256 balanceIn;
+        uint256 balanceOut;
+    }
+
+    /**
      * @notice emitted at each mint
-     * @param sender address calling the mint function (usualy the Router contract)
+     * @param sender address calling the mint function (usually the Router contract)
      * @param to address that receives the LP-tokens
      * @param amount0 amount of token0 to be added in liquidity
      * @param amount1 amount of token1 to be added in liquidity
@@ -18,7 +42,7 @@ interface ISmardexPair is IERC20, IERC20Permit {
 
     /**
      * @notice emitted at each burn
-     * @param sender address calling the burn function (usualy the Router contract)
+     * @param sender address calling the burn function (usually the Router contract)
      * @param to address that receives the tokens
      * @param amount0 amount of token0 to be withdrawn
      * @param amount1 amount of token1 to be withdrawn
@@ -28,7 +52,7 @@ interface ISmardexPair is IERC20, IERC20Permit {
 
     /**
      * @notice emitted at each swap
-     * @param sender address calling the swap function (usualy the Router contract)
+     * @param sender address calling the swap function (usually the Router contract)
      * @param to address that receives the out-tokens
      * @param amount0 amount of token0 to be swapped
      * @param amount1 amount of token1 to be swapped
@@ -56,6 +80,13 @@ interface ISmardexPair is IERC20, IERC20Permit {
     );
 
     /**
+     * @notice emitted each time feesLP and feesPool are changed
+     * @param feesLP new feesLP
+     * @param feesPool new feesPool
+     */
+    event FeesChanged(uint256 indexed feesLP, uint256 indexed feesPool);
+
+    /**
      * @notice get the factory address
      * @return address of the factory
      */
@@ -77,8 +108,10 @@ interface ISmardexPair is IERC20, IERC20Permit {
      * @notice called once by the factory at time of deployment
      * @param _token0 address of token0
      * @param _token1 address of token1
+     * @param _feesLP uint128 feesLP numerator
+     * @param _feesPool uint128 feesPool numerator
      */
-    function initialize(address _token0, address _token1) external;
+    function initialize(address _token0, address _token1, uint128 _feesLP, uint128 _feesPool) external;
 
     /**
      * @notice return current Reserves of both token in the pair,
@@ -89,7 +122,7 @@ interface ISmardexPair is IERC20, IERC20Permit {
     function getReserves() external view returns (uint256 reserve0_, uint256 reserve1_);
 
     /**
-     * @notice return current Fictives Reserves of both token in the pair
+     * @notice return current fictive reserves of both token in the pair
      * @return fictiveReserve0_ current fictive reserve of token0
      * @return fictiveReserve1_ current fictive reserve of token1
      */
@@ -100,7 +133,14 @@ interface ISmardexPair is IERC20, IERC20Permit {
      * @return fees0_ current pending fees of token0
      * @return fees1_ current pending fees of token1
      */
-    function getFees() external view returns (uint256 fees0_, uint256 fees1_);
+    function getFeeToAmounts() external view returns (uint256 fees0_, uint256 fees1_);
+
+    /**
+     * @notice return numerators of pair fees, denominator is 1_000_000
+     * @return feesLP_ numerator of fees sent to LP
+     * @return feesPool_ numerator of fees sent to Pool
+     */
+    function getPairFees() external view returns (uint128 feesLP_, uint128 feesPool_);
 
     /**
      * @notice return last updated price average at timestamp of both token in the pair,
@@ -176,4 +216,12 @@ interface ISmardexPair is IERC20, IERC20Permit {
         int256 _amountSpecified,
         bytes calldata _data
     ) external returns (int256 amount0_, int256 amount1_);
+
+    /**
+     * @notice set feesLP and feesPool of the pair
+     * @notice sum of new feesLp and feesPool must be <= 100_000
+     * @param _feesLP new numerator of fees sent to LP, must be >= 1
+     * @param _feesPool new numerator of fees sent to Pool, could be = 0
+     */
+    function setFees(uint128 _feesLP, uint128 _feesPool) external;
 }

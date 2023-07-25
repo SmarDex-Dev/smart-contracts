@@ -26,6 +26,8 @@ import { shouldBehaveLikeSwapETHForExactTokens } from "./specs/swapETHForExactTo
 import { shouldBehaveLikeSwapCallback } from "./specs/swapCallback.spec";
 import { shouldBehaveLikeUnwrapWETH } from "./specs/unwrapWETH.spec";
 import { shouldBehaveLikeCheckFailedTest } from "./specs/testnetCheckFailedTest";
+import { shouldRefundUnusedETH } from "./specs/refundEth.spec";
+import { shouldBehaveLikeSmardexRouterGetAmountFromPair } from "./specs/getAmountFromPair.spec";
 
 export function unitTestsSmardexRouter(): void {
   describe("SmarDexRouter", function () {
@@ -51,15 +53,44 @@ export function unitTestsSmardexRouter(): void {
       });
     });
 
+    describe("getAmountFromPair Test", function () {
+      beforeEach(async function () {
+        const { token0, token1, smardexPairTest, factory, smardexRouterTest } = await loadFixture(
+          unitFixtureSmardexPairTest,
+        );
+
+        this.contracts.token0 = token0;
+        this.contracts.token1 = token1;
+        this.contracts.smardexFactory = factory;
+        this.contracts.smardexPairTest = smardexPairTest;
+        this.contracts.smardexRouterTest = smardexRouterTest;
+      });
+
+      describe("Smardex Router getAmountFromPair", function () {
+        shouldBehaveLikeSmardexRouterGetAmountFromPair();
+      });
+    });
+
     describe("SmarDexRouter user functions", function () {
       beforeEach(async function () {
-        const { token0, token1, WETH, WETHPartner, factory, smardexRouter, pair, WETHPair, routerEventEmitter } =
-          await loadFixture(unitFixtureSmardexRouter);
+        const {
+          token0,
+          token1,
+          WETH,
+          WETHPartner,
+          factory,
+          autoSwapper,
+          smardexRouter,
+          pair,
+          WETHPair,
+          routerEventEmitter,
+        } = await loadFixture(unitFixtureSmardexRouter);
         this.contracts.token0 = token0;
         this.contracts.token1 = token1;
         this.contracts.WETH = WETH;
         this.contracts.WETHPartner = WETHPartner;
         this.contracts.smardexFactory = factory;
+        this.contracts.autoSwapper = autoSwapper;
         this.contracts.smardexRouter = smardexRouter;
         this.contracts.smardexPair = pair;
         this.contracts.WETHPair = WETHPair;
@@ -89,6 +120,9 @@ export function unitTestsSmardexRouter(): void {
       describe("Remove Liquidity ETH With Permit", function () {
         shouldBehaveLikeRemoveLiquidityETHWithPermit();
       });
+      describe("Refund unused ETH", function () {
+        shouldRefundUnusedETH();
+      });
       describe("swapExactTokensForTokens", () => {
         shouldBehaveLikeSwapExactTokensForTokens();
       });
@@ -107,7 +141,6 @@ export function unitTestsSmardexRouter(): void {
       describe("swapETHForExactTokens", () => {
         shouldBehaveLikeSwapETHForExactTokens();
       });
-
       describe("Router Quote", function () {
         shouldBehaveLikeSmardexRouterQuote();
       });

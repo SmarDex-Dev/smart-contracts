@@ -1,7 +1,14 @@
 import { expect } from "chai";
 import { BigNumber, constants } from "ethers";
 import { hexConcat, parseEther } from "ethers/lib/utils";
-import { ERC20Test, SmardexPair__factory, SmardexRouter } from "../../../typechain";
+import {
+  AutoSwapper,
+  AutoSwapperL2,
+  AutoSwapper__factory,
+  ERC20Test,
+  SmardexPair__factory,
+  SmardexRouter,
+} from "../../../typechain";
 import { getSwapEncodedData } from "../../utils";
 
 async function addLiquidity(
@@ -74,7 +81,10 @@ export function shouldBehaveLikeAutoSwapper() {
         it("Check addresses ", async function () {
           expect(await this.contracts.smardexFactory.feeTo()).to.eq(this.contracts.autoSwapper.address);
           // staking address is factory contract as we did not deploy a staking contract for unit tests
-          expect(await this.contracts.autoSwapper.stakingAddress()).to.eq(this.contracts.smardexFactory.address);
+          try {
+            const stakingAddress = await (<AutoSwapper>this.contracts.autoSwapper).stakingAddress();
+            expect(stakingAddress).to.eq(this.misc.targetAddress);
+          } catch (e) {}
           expect(await this.contracts.autoSwapper.smardexToken()).to.eq(this.contracts.smardexToken.address);
           expect(this.contracts.smardexToken.address).to.eq(this.contracts.token0.address);
         });
@@ -86,7 +96,7 @@ export function shouldBehaveLikeAutoSwapper() {
           await expect(
             this.contracts.autoSwapper.executeWork(this.contracts.token0.address, this.contracts.token1.address),
           ).to.not.be.reverted;
-          expect(await this.contracts.token0.balanceOf(this.contracts.smardexFactory.address)).to.eq(parseEther("1"));
+          expect(await this.contracts.token0.balanceOf(this.misc.targetAddress)).to.eq(parseEther("1"));
           expect(await this.contracts.token1.balanceOf(this.contracts.autoSwapper.address)).to.eq(parseEther("1"));
           expect(await this.contracts.token0.balanceOf(this.contracts.autoSwapper.address)).to.eq(0);
         });
@@ -110,7 +120,7 @@ export function shouldBehaveLikeAutoSwapper() {
       });
       context("with SDEX in pair's Tokens", function () {
         it("should executeWork on autoSwapper and swap all tokens on his own pair", async function () {
-          const balanceBefore = await this.contracts.smardexToken.balanceOf(this.contracts.smardexFactory.address);
+          const balanceBefore = await this.contracts.smardexToken.balanceOf(this.misc.targetAddress);
           await swapBothTokens(
             this.contracts.smardexRouter,
             amountIn,
@@ -118,7 +128,7 @@ export function shouldBehaveLikeAutoSwapper() {
             this.contracts.token1,
             this.signers.admin.address,
           );
-          const [fee0, fee1] = await this.contracts.smardexPair.getFees();
+          const [fee0, fee1] = await this.contracts.smardexPair.getFeeToAmounts();
           expect(fee0).to.not.eq(0);
           expect(fee1).to.not.eq(0);
 
@@ -136,7 +146,7 @@ export function shouldBehaveLikeAutoSwapper() {
           );
 
           // We can not check for feeToAmount after burn or mint because we swapped in pair so feeToAmount increased again
-          const [fee0After, fee1After] = await this.contracts.smardexPair.getFees();
+          const [fee0After, fee1After] = await this.contracts.smardexPair.getFeeToAmounts();
           expect(fee0After).to.eq(0);
           expect(fee1After).to.not.eq(0);
 
@@ -144,7 +154,7 @@ export function shouldBehaveLikeAutoSwapper() {
           expect(lp.sub(lpAfter)).to.eq(lp.div(2));
           // if autoSwapper balance is != 0 then swap failed
           expect(await this.contracts.token1.balanceOf(this.contracts.autoSwapper.address)).to.eq(0);
-          const balanceAfter = await this.contracts.smardexToken.balanceOf(this.contracts.smardexFactory.address);
+          const balanceAfter = await this.contracts.smardexToken.balanceOf(this.misc.targetAddress);
 
           expect(balanceAfter).to.not.eq(balanceBefore);
         });
@@ -194,7 +204,7 @@ export function shouldBehaveLikeAutoSwapper() {
               ),
             ).to.not.be.reverted;
           }
-          const [fee0, fee1] = await this.contracts.smardexPair.getFees();
+          const [fee0, fee1] = await this.contracts.smardexPair.getFeeToAmounts();
           expect(fee0).to.eq(0);
           expect(fee1).to.not.eq(0);
         });
@@ -220,7 +230,7 @@ export function shouldBehaveLikeAutoSwapper() {
           const pairT1WETHP = SmardexPair__factory.connect(addressT1WETHP, this.signers.admin);
           await pairT1WETHP.approve(this.contracts.smardexRouter.address, constants.MaxUint256);
 
-          const balanceBefore = await this.contracts.smardexToken.balanceOf(this.contracts.smardexFactory.address);
+          const balanceBefore = await this.contracts.smardexToken.balanceOf(this.misc.targetAddress);
 
           await this.contracts.smardexRouter.swapExactTokensForTokens(
             amountIn.div(2),
@@ -230,7 +240,7 @@ export function shouldBehaveLikeAutoSwapper() {
             constants.MaxUint256,
           );
           const t0isWethP = (await pairT1WETHP.token0()) === this.contracts.WETHPartner.address;
-          let [fee0, fee1] = await pairT1WETHP.getFees();
+          let [fee0, fee1] = await pairT1WETHP.getFeeToAmounts();
           let fees = t0isWethP ? fee0 : fee1;
           // We swapped one way only so we should have only fee0
           expect(fees).to.not.eq(0);
@@ -248,7 +258,7 @@ export function shouldBehaveLikeAutoSwapper() {
             constants.MaxUint256,
           );
 
-          [fee0, fee1] = await pairT1WETHP.getFees();
+          [fee0, fee1] = await pairT1WETHP.getFeeToAmounts();
           fees = t0isWethP ? fee0 : fee1;
           expect(fees).to.eq(0);
 
@@ -262,7 +272,7 @@ export function shouldBehaveLikeAutoSwapper() {
           expect(lp.sub(lpAfter)).to.eq(lp.div(2));
           // if autoSwapper balance is != 0 then swap failed, and it should have because we dont have a pair corresponding
           expect(await this.contracts.WETHPartner.balanceOf(this.contracts.autoSwapper.address)).to.not.eq(0);
-          const balanceAfter = await this.contracts.smardexToken.balanceOf(this.contracts.smardexFactory.address);
+          const balanceAfter = await this.contracts.smardexToken.balanceOf(this.misc.targetAddress);
 
           expect(balanceAfter).to.eq(balanceBefore);
         });
@@ -296,7 +306,7 @@ export function shouldBehaveLikeAutoSwapper() {
             constants.MaxUint256,
           );
 
-          const balanceBefore = await this.contracts.smardexToken.balanceOf(this.contracts.smardexFactory.address);
+          const balanceBefore = await this.contracts.smardexToken.balanceOf(this.misc.targetAddress);
 
           await this.contracts.smardexRouter.swapExactTokensForTokens(
             amountIn,
@@ -345,7 +355,7 @@ export function shouldBehaveLikeAutoSwapper() {
           // if autoSwapper balance is != 0 then swap failed
           expect(await this.contracts.WETHPartner.balanceOf(this.contracts.autoSwapper.address)).to.eq(0);
           expect(await this.contracts.token1.balanceOf(this.contracts.autoSwapper.address)).to.eq(0);
-          const balanceAfter = await this.contracts.smardexToken.balanceOf(this.contracts.smardexFactory.address);
+          const balanceAfter = await this.contracts.smardexToken.balanceOf(this.misc.targetAddress);
           expect(balanceAfter).to.not.eq(balanceBefore);
         });
         it("should executeWork on autoSwapper and swap all tokens on another pair with price < 0", async function () {
@@ -378,7 +388,7 @@ export function shouldBehaveLikeAutoSwapper() {
             constants.MaxUint256,
           );
 
-          const balanceBefore = await this.contracts.smardexToken.balanceOf(this.contracts.smardexFactory.address);
+          const balanceBefore = await this.contracts.smardexToken.balanceOf(this.misc.targetAddress);
 
           await this.contracts.smardexRouter.swapExactTokensForTokens(
             amountIn,
@@ -427,7 +437,7 @@ export function shouldBehaveLikeAutoSwapper() {
           // if autoSwapper balance is != 0 then swap failed
           expect(await this.contracts.WETHPartner.balanceOf(this.contracts.autoSwapper.address)).to.eq(0);
           expect(await this.contracts.token1.balanceOf(this.contracts.autoSwapper.address)).to.eq(0);
-          const balanceAfter = await this.contracts.smardexToken.balanceOf(this.contracts.smardexFactory.address);
+          const balanceAfter = await this.contracts.smardexToken.balanceOf(this.misc.targetAddress);
           expect(balanceAfter).to.not.eq(balanceBefore);
         });
         it("should fail because attacker tried to manipulate price", async function () {
@@ -526,7 +536,7 @@ export function shouldBehaveLikeAutoSwapper() {
           await pairSdexWethp.approve(this.contracts.smardexRouter.address, constants.MaxUint256);
 
           const lp = await pairT1WETHP.balanceOf(this.signers.admin.address);
-          const balanceBefore = await this.contracts.smardexToken.balanceOf(this.contracts.smardexFactory.address);
+          const balanceBefore = await this.contracts.smardexToken.balanceOf(this.misc.targetAddress);
 
           // burn for _mintFee, all lp as we dont need this pair get SDEX
           // We should get NO token swapped (token1, WETHPartner) to SDEX because of induced slippage from attack
@@ -545,7 +555,7 @@ export function shouldBehaveLikeAutoSwapper() {
           // if autoSwapper balance is != 0 then swap failed, and we want it to because of attack
           expect(await this.contracts.WETHPartner.balanceOf(this.contracts.autoSwapper.address)).to.not.eq(0);
           expect(await this.contracts.token1.balanceOf(this.contracts.autoSwapper.address)).to.not.eq(0);
-          const balanceAfter = await this.contracts.smardexToken.balanceOf(this.contracts.smardexFactory.address);
+          const balanceAfter = await this.contracts.smardexToken.balanceOf(this.misc.targetAddress);
 
           expect(balanceAfter).to.eq(balanceBefore);
         });

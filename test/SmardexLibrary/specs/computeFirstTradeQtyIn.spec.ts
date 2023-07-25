@@ -1,6 +1,6 @@
 import { parseEther } from "ethers/lib/utils";
 import { expect } from "chai";
-import { sqrt } from "../utils";
+import { sqrt } from "../../utils";
 import { FEES_BASE, FEES_LP, FEES_POOL, FEES_TOTAL_REVERSED } from "../../constants";
 
 export function shouldBehaveLikeComputeFirstTradeQtyIn(): void {
@@ -17,6 +17,8 @@ export function shouldBehaveLikeComputeFirstTradeQtyIn(): void {
       fictiveReserveOut,
       priceAverageIn,
       priceAverageOut,
+      FEES_LP,
+      FEES_POOL,
     );
     expect(amountIn).to.be.eq(result);
   });
@@ -34,6 +36,8 @@ export function shouldBehaveLikeComputeFirstTradeQtyIn(): void {
       fictiveReserveOut,
       priceAverageIn,
       priceAverageOut,
+      FEES_LP,
+      FEES_POOL,
     );
     expect(amountIn).to.be.eq(result);
   });
@@ -45,14 +49,19 @@ export function shouldBehaveLikeComputeFirstTradeQtyIn(): void {
     const priceAverageIn = parseEther("10");
     const priceAverageOut = parseEther("8");
 
+    let firstAmountOut = amountIn;
+
     const result = await this.contracts.smardexLibraryTest.computeFirstTradeQtyIn(
       amountIn,
       fictiveReserveIn,
       fictiveReserveOut,
       priceAverageIn,
       priceAverageOut,
+      FEES_LP,
+      FEES_POOL,
     );
-    const toSub = FEES_BASE.add(FEES_TOTAL_REVERSED).sub(FEES_POOL).mul(fictiveReserveIn);
+
+    const toSub = fictiveReserveIn.mul(FEES_BASE.add(FEES_TOTAL_REVERSED).sub(FEES_POOL));
     const toDiv = FEES_TOTAL_REVERSED.add(FEES_LP).mul(2);
     const inSqrt = fictiveReserveIn
       .mul(fictiveReserveOut)
@@ -62,7 +71,10 @@ export function shouldBehaveLikeComputeFirstTradeQtyIn(): void {
       .mul(FEES_TOTAL_REVERSED.mul(FEES_BASE.sub(FEES_POOL)))
       .add(fictiveReserveIn.mul(fictiveReserveIn).mul(FEES_LP.mul(FEES_LP)));
 
-    const firstAmountOut = sqrt(inSqrt).sub(toSub).div(toDiv);
+    if (inSqrt.lt(toSub.add(amountIn.mul(toDiv)).pow(2))) {
+      firstAmountOut = sqrt(inSqrt).sub(toSub).div(toDiv);
+    }
+
     expect(firstAmountOut).to.be.eq(result);
   });
 
@@ -101,6 +113,8 @@ export function shouldBehaveLikeComputeFirstTradeQtyIn(): void {
         value.fictiveReserveOut,
         value.priceAverageIn,
         value.priceAverageOut,
+        FEES_LP,
+        FEES_POOL,
       );
       expect(result).to.be.eq(value.firstTradeQtyIn);
     }

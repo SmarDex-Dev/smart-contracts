@@ -1,10 +1,8 @@
 import { expect } from "chai";
-import { constants, providers } from "ethers";
+import { constants } from "ethers";
 import { deployERC20Test, deploySmardexPairTest } from "../../deployers";
-import { parseEther, parseUnits } from "ethers/lib/utils";
-import { Contracts, Signers } from "../../types";
+import { parseEther } from "ethers/lib/utils";
 import { GetAmountTrade } from "../../SmardexLibrary/utils";
-import { time } from "@nomicfoundation/hardhat-network-helpers";
 import { getImpersonatedSigner } from "@nomiclabs/hardhat-ethers/internal/helpers";
 import hre, { ethers } from "hardhat";
 import {
@@ -14,6 +12,8 @@ import {
   SmardexToken__factory,
 } from "../../../typechain";
 import { FEES_BASE, FEES_POOL } from "../../constants";
+import { Contracts, Signers } from "../../types";
+import { time } from "@nomicfoundation/hardhat-network-helpers";
 
 export function shouldBehaveLikeCheckFailedTest(): void {
   it("try revert case", async function () {
@@ -126,7 +126,7 @@ export function shouldBehaveLikeCheckFailedTest(): void {
     // const amountUSDT = parseUnits("100000", 6);
     const amountSmardex = parseEther("100000");
 
-    const feesBefore = await pair.getFees();
+    const feesBefore = await pair.getFeeToAmounts();
     const reservesBefore = await pair.getReserves();
 
     console.log(await ethers.provider.getBlockNumber());
@@ -167,7 +167,7 @@ export function shouldBehaveLikeCheckFailedTest(): void {
     console.log(await ethers.provider.getBlockNumber());
 
     const reservesAfter = await pair.getReserves();
-    const feesAfter = await pair.getFees();
+    const feesAfter = await pair.getFeeToAmounts();
 
     console.log(reservesBefore.reserve0_);
     console.log(reservesAfter.reserve0_);
