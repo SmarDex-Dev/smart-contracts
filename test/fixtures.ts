@@ -1,40 +1,17 @@
 import type { Signer } from "@ethersproject/abstract-signer";
-
 import { BigNumber, constants } from "ethers";
-import {
-  AutoSwapper,
-  AutoSwapperL2,
-  CallbackTest,
-  CheckBlockTest,
-  ERC20Permit,
-  ERC20Test,
-  FakeERC20reentrancy,
-  FarmingRange,
-  FarmingRangeL2Arbitrum,
-  RewardManagerTest,
-  RewardManagerTestL2,
-  RewardManagerTestL2Arbitrum,
-  RouterEventEmitter,
-  RouterForPairTest,
-  SmardexFactory,
-  SmardexFactoryTest,
-  SmardexLibraryTest,
-  SmardexPair,
-  SmardexPairTest,
-  SmardexRouter,
-  SmardexRouterTest,
-  SmardexTokenTest,
-  Staking,
-  TetherToken,
-  WETH9,
-} from "../typechain";
+import { solidityPack, getAddress } from "ethers/lib/utils";
+import { FarmingRange, SmardexFactory, SmardexFactoryV1, ERC20Test } from "../typechain";
+
 import {
   deployAutoSwapperL1,
   deployAutoSwapperL2,
   deployCallbackTestRouter,
+  deployCallbackTestRouterV2,
   deployCheckBlockTest,
   deployERC20Test,
   deployFakeERC20reentrancy,
+  deployFakeERC20reentrancyV2,
   deployFarmingRange,
   deployFarmingRangeL2Arbitrum,
   deployOrderedPairOfERC20,
@@ -43,67 +20,105 @@ import {
   deployRewardManagerTestL2Arbitrum,
   deployRouterEventEmitter,
   deployRouterForPairTest,
+  deployRouterForPairTestV2,
   deploySmardexFactory,
+  deploySmardexFactoryV1,
   deploySmardexFactoryTest,
+  deploySmardexFactoryTestV1,
+  deploySmardexLibraryTestV1,
   deploySmardexLibraryTest,
   deploySmardexPair,
+  deploySmardexPairV1,
   deploySmardexPairTest,
+  deploySmardexPairTestV1,
   deploySmardexRouter,
+  deploySmardexRouterV2WithV1Factory,
   deploySmardexRouterTest,
+  deploySmardexRouterTestV2,
   deploySmardexToken,
   deployStaking,
   deployTetherToken,
   deployWETH9,
+  deployV1Pair,
+  deployOrderedPairFluid,
+  deploySmardexPairFluid,
 } from "./deployers";
-import { parseEther } from "ethers/lib/utils";
+
+import { keccak256, parseEther } from "ethers/lib/utils";
 import { advanceBlockTo, latest, latestBlockNumber } from "./helpers/time";
 import { ethers } from "hardhat";
 import { latestBlockNumberL2Arbitrum } from "./utils";
 
-type UnitFixtureSmardexFactory = {
-  smardexToken: ERC20Permit;
-  factory: SmardexFactory;
-};
+async function unitFixtureCommon(amount: BigNumber) {
+  const [token0, token1] = await deployOrderedPairOfERC20(amount);
+  const WETH = await deployWETH9();
 
-export async function unitFixtureSmardexFactory(): Promise<UnitFixtureSmardexFactory> {
-  const smardexToken: ERC20Permit = await deployERC20Test(parseEther("10000"));
-  const factory: SmardexFactory = await deploySmardexFactory();
+  return {
+    token0,
+    token1,
+    WETH,
+  };
+}
+
+export async function unitFixtureSmardexFactory() {
+  const smardexToken = await deployERC20Test(parseEther("10000"));
+  const { token0, token1, WETH } = await unitFixtureCommon(constants.MaxUint256);
+  const factory = await deploySmardexFactory();
 
   return {
     smardexToken,
     factory,
+    token0,
+    token1,
+    WETH,
   };
 }
 
-type UnitFixtureSmardexLibraryTest = {
-  smardexLibraryTest: SmardexLibraryTest;
-  smardexRouter: SmardexRouter;
-  smardexPair: SmardexPair;
-  token0: ERC20Test;
-  token1: ERC20Test;
-};
+export async function unitFixtureSmardexFactoryV1() {
+  const smardexToken = await deployERC20Test(parseEther("10000"));
+  const { token0, token1, WETH } = await unitFixtureCommon(constants.MaxUint256);
+  const factory = await deploySmardexFactoryV1();
 
-export async function unitFixtureSmardexLibraryTest(): Promise<UnitFixtureSmardexLibraryTest> {
+  return {
+    smardexToken,
+    factory,
+    token0,
+    token1,
+    WETH,
+  };
+}
+
+export async function unitFixtureSmardexLibraryTestV2() {
   const [admin] = await ethers.getSigners();
-  const smardexLibraryTest: SmardexLibraryTest = await deploySmardexLibraryTest();
-  const smardexWETH: WETH9 = await deployWETH9();
-  const smardexFactory: SmardexFactory = await deploySmardexFactory();
-  const smardexRouter: SmardexRouter = await deploySmardexRouter(smardexFactory, smardexWETH);
+  const smardexLibraryTest = await deploySmardexLibraryTest();
+  const smardexWETH = await deployWETH9();
+
+  const smardexFactory = await deploySmardexFactory();
+  await smardexFactory.closeWhitelist();
+  const smardexRouter = await deploySmardexRouter(smardexFactory, smardexWETH);
+
   const [token0, token1] = await deployOrderedPairOfERC20(constants.MaxUint256);
   const amount0 = parseEther("1500000");
   const amount1 = parseEther("10000");
   await token0.approve(smardexRouter.address, amount0);
   await token1.approve(smardexRouter.address, amount1);
-  const now = await latest();
+
   const smardexPair = await deploySmardexPair(smardexFactory, token0, token1);
 
+  const now = await latest();
+
   await smardexRouter.addLiquidity(
-    token0.address,
-    token1.address,
-    amount0,
-    amount1,
-    0,
-    0,
+    {
+      tokenA: token0.address,
+      tokenB: token1.address,
+      amountADesired: amount0,
+      amountBDesired: amount1,
+      amountAMin: 0,
+      amountBMin: 0,
+      fictiveReserveB: 0,
+      fictiveReserveAMin: 0,
+      fictiveReserveAMax: 0,
+    },
     admin.address,
     now.add(10000),
   );
@@ -117,23 +132,59 @@ export async function unitFixtureSmardexLibraryTest(): Promise<UnitFixtureSmarde
   };
 }
 
-type UnitFixtureRouterForPairTest = {
-  factory: SmardexFactoryTest;
-  smardexPairTest: SmardexPairTest;
-  token0: ERC20Test;
-  token1: ERC20Test;
-  smardexRouterTest: SmardexRouterTest;
-  routerForPairTest: RouterForPairTest;
-  WETH: WETH9;
-};
+export async function unitFixtureSmardexLibraryTestV1() {
+  const [admin] = await ethers.getSigners();
+  const smardexLibraryTest = await deploySmardexLibraryTestV1();
+  const smardexWETH = await deployWETH9();
 
-export async function unitFixtureSmardexPairTest(): Promise<UnitFixtureRouterForPairTest> {
-  const factory = await deploySmardexFactoryTest();
+  const smardexFactory = await deploySmardexFactoryV1();
+  const smardexRouter = await deploySmardexRouterV2WithV1Factory(smardexFactory, smardexWETH);
+
   const [token0, token1] = await deployOrderedPairOfERC20(constants.MaxUint256);
-  const smardexPairTest = await deploySmardexPairTest(factory, token0, token1);
-  const WETH = await deployWETH9();
+  const amount0 = parseEther("1500000");
+  const amount1 = parseEther("10000");
+  await token0.approve(smardexRouter.address, amount0);
+  await token1.approve(smardexRouter.address, amount1);
+
+  const smardexPair = await deploySmardexPairV1(smardexFactory, token0, token1);
+
+  const now = await latest();
+
+  await smardexRouter.addLiquidity(
+    {
+      tokenA: token0.address,
+      tokenB: token1.address,
+      amountADesired: amount0,
+      amountBDesired: amount1,
+      amountAMin: 0,
+      amountBMin: 0,
+      fictiveReserveB: 0,
+      fictiveReserveAMin: 0,
+      fictiveReserveAMax: 0,
+    },
+    admin.address,
+    now.add(10000),
+  );
+
+  return {
+    smardexLibraryTest,
+    smardexRouter,
+    smardexPair,
+    token0,
+    token1,
+  };
+}
+
+export async function unitFixtureSmardexPairTest() {
+  const { token0, token1, WETH } = await unitFixtureCommon(constants.MaxUint256);
+  const factory = await deploySmardexFactoryTest();
+  await factory.closeWhitelist();
+
   const routerForPairTest = await deployRouterForPairTest(factory, WETH);
+
   const smardexRouterTest = await deploySmardexRouterTest(factory, WETH);
+
+  const smardexPairTest = await deploySmardexPairTest(factory, token0, token1);
 
   return {
     factory,
@@ -146,21 +197,75 @@ export async function unitFixtureSmardexPairTest(): Promise<UnitFixtureRouterFor
   };
 }
 
-type UnitFixtureRouterTest = {
-  token0: ERC20Test;
-  token1: ERC20Test;
-  factory: SmardexFactory;
-  pair: SmardexPair;
-  smardexRouterTest: SmardexRouterTest;
-  smardexRouterCallbackTest: CallbackTest;
-  WETH: WETH9;
-};
+export async function unitFixtureSmardexPairTestV1() {
+  const { token0, token1, WETH } = await unitFixtureCommon(constants.MaxUint256);
+  const factory = await deploySmardexFactoryTestV1();
 
-export async function unitFixtureSmardexRouterTest(): Promise<UnitFixtureRouterTest> {
-  const [token0, token1] = await deployOrderedPairOfERC20(constants.MaxUint256);
+  const routerForPairTest = await deployRouterForPairTestV2(factory, WETH);
+  const smardexRouterTest = await deploySmardexRouterTestV2(factory, WETH);
+  const smardexPairTest = await deploySmardexPairTestV1(factory, token0, token1);
+
+  return {
+    factory,
+    smardexPairTest,
+    token0,
+    token1,
+    routerForPairTest,
+    smardexRouterTest,
+    WETH,
+  };
+}
+
+export async function unitFixtureSmardexRouterTest() {
+  const { token0, token1, WETH } = await unitFixtureCommon(constants.MaxUint256);
+
   const factory = await deploySmardexFactory();
+  await factory.closeWhitelist();
   const pair = await deploySmardexPair(factory, token0, token1);
-  const WETH = await deployWETH9();
+
+  const smardexRouterTest = await deploySmardexRouterTest(factory, WETH);
+
+  const smardexRouterCallbackTest = await deployCallbackTestRouter(factory, WETH);
+
+  return {
+    token0,
+    token1,
+    factory,
+    pair,
+    smardexRouterTest,
+    smardexRouterCallbackTest,
+    WETH,
+  };
+}
+
+async function determinePairAddress(token0: ERC20Test, token1: ERC20Test, factory: SmardexFactory) {
+  const salt = keccak256(solidityPack(["address", "address"], [token0.address, token1.address]));
+  const pairFactory = await ethers.getContractFactory("SmardexPair");
+  return getAddress(
+    "0x" +
+      keccak256(
+        solidityPack(
+          ["bytes1", "address", "bytes32", "bytes32"],
+          ["0xFF", factory.address, salt, keccak256(pairFactory.bytecode)],
+        ),
+      ).slice(26, constants.HashZero.length),
+  );
+}
+
+export async function unitFixtureSmardexPairTwoTokenInBefore() {
+  const { token0, token1, WETH } = await unitFixtureCommon(constants.MaxUint256);
+
+  const factory = await deploySmardexFactory();
+  await factory.closeWhitelist();
+  const expectedPairAddress = await determinePairAddress(token0, token1, factory);
+
+  await (await token0.transfer(expectedPairAddress, parseEther("1"))).wait();
+  await (await token1.transfer(expectedPairAddress, parseEther("10"))).wait();
+
+  const pair = await deploySmardexPair(factory, token0, token1);
+
+  if (pair.address !== expectedPairAddress) throw new Error("wrong pair address");
+
   const smardexRouterTest = await deploySmardexRouterTest(factory, WETH);
   const smardexRouterCallbackTest = await deployCallbackTestRouter(factory, WETH);
 
@@ -175,33 +280,75 @@ export async function unitFixtureSmardexRouterTest(): Promise<UnitFixtureRouterT
   };
 }
 
-type UnitFixtureSmardexRouter = {
-  token0: ERC20Test;
-  token1: ERC20Test;
-  WETH: WETH9;
-  WETHPartner: ERC20Test;
-  factory: SmardexFactory;
-  smardexRouter: SmardexRouter;
-  pair: SmardexPair;
-  WETHPair: SmardexPair;
-  routerEventEmitter: RouterEventEmitter;
-  autoSwapper: AutoSwapper | AutoSwapperL2;
-};
+export async function unitFixtureSmardexPairOneTokenInBefore() {
+  const { token0, token1, WETH } = await unitFixtureCommon(constants.MaxUint256);
 
-export async function unitFixtureSmardexRouter(): Promise<UnitFixtureSmardexRouter> {
-  const [token0, token1] = await deployOrderedPairOfERC20(parseEther("10000000"));
-  const WETH = await deployWETH9();
-  const WETHPartner = await deployERC20Test(parseEther("10000000"));
   const factory = await deploySmardexFactory();
-  const smardexRouter = await deploySmardexRouter(factory, WETH);
+  await factory.closeWhitelist();
+  const expectedPairAddress = await determinePairAddress(token0, token1, factory);
+
+  await (await token1.transfer(expectedPairAddress, parseEther("10"))).wait();
   const pair = await deploySmardexPair(factory, token0, token1);
+
+  if (pair.address !== expectedPairAddress) throw new Error("wrong pair address");
+
+  const smardexRouterTest = await deploySmardexRouterTest(factory, WETH);
+  const smardexRouterCallbackTest = await deployCallbackTestRouter(factory, WETH);
+
+  return {
+    token0,
+    token1,
+    factory,
+    pair,
+    smardexRouterTest,
+    smardexRouterCallbackTest,
+    WETH,
+  };
+}
+
+export async function unitFixtureSmardexRouterTestV1() {
+  const { token0, token1, WETH } = await unitFixtureCommon(constants.MaxUint256);
+
+  const factory = await deploySmardexFactoryV1();
+
+  const pair = await deploySmardexPairV1(factory, token0, token1);
+
+  const smardexRouterTest = await deploySmardexRouterTestV2(factory, WETH);
+
+  const smardexRouterCallbackTest = await deployCallbackTestRouterV2(factory, WETH);
+
+  return {
+    token0,
+    token1,
+    factory,
+    pair,
+    smardexRouterTest,
+    smardexRouterCallbackTest,
+    WETH,
+  };
+}
+
+export async function unitFixtureSmardexRouter() {
+  const amount = parseEther("10000000");
+  const { token0, token1, WETH } = await unitFixtureCommon(amount);
+  const WETHPartner = await deployERC20Test(amount);
   const routerEventEmitter = await deployRouterEventEmitter();
+
+  const factory = await deploySmardexFactory();
+  await factory.closeWhitelist();
+  const smardexRouter = await deploySmardexRouter(factory, WETH);
+
+  const pair = await deploySmardexPair(factory, token0, token1);
+
   const WETHPair = await deploySmardexPair(factory, WETH, WETHPartner);
+
   const sdex = await deploySmardexToken("Smardex Token Test", "SDEX", parseEther("10000"));
+
   const farming = await deploySmardexFactory();
 
   const staking = await deployStaking(sdex.address, farming.address);
-  const autoSwapper = await deployAutoSwapperL1(factory.address, sdex.address, staking.address);
+
+  const autoSwapper = await deployAutoSwapperL1(factory.address, sdex.address, staking.address, smardexRouter.address);
 
   return {
     token0,
@@ -217,23 +364,90 @@ export async function unitFixtureSmardexRouter(): Promise<UnitFixtureSmardexRout
   };
 }
 
-type UnitFixtureCallbackTest = {
-  token0: ERC20Test;
-  token1: ERC20Test;
-  WETH: WETH9;
-  factory: SmardexFactory;
-  smardexRouter: SmardexRouter;
-  smardexRouterCallbackTest: CallbackTest;
-  pair: SmardexPair;
-  fakeERC20reentrancy: FakeERC20reentrancy;
-};
+export async function unitFixtureSmardexRouterV2WithFactoryV1() {
+  const amount = parseEther("10000000");
+  const { token0, token1, WETH } = await unitFixtureCommon(amount);
+  const WETHPartner = await deployERC20Test(amount);
+  const routerEventEmitter = await deployRouterEventEmitter();
 
-export async function unitFixtureCallbackTest(): Promise<UnitFixtureCallbackTest> {
-  const [token0, token1] = await deployOrderedPairOfERC20(parseEther("10000000"));
-  const WETH = await deployWETH9();
+  const factory = await deploySmardexFactoryV1();
+
+  const smardexRouter = await deploySmardexRouterV2WithV1Factory(factory, WETH);
+
+  const pair = await deploySmardexPairV1(factory, token0, token1);
+
+  const WETHPair = await deploySmardexPairV1(factory, WETH, WETHPartner);
+
+  const sdex = await deploySmardexToken("Smardex Token Test", "SDEX", parseEther("10000"));
+
+  const farming = await deploySmardexFactoryV1();
+
+  const staking = await deployStaking(sdex.address, farming.address);
+
+  const autoSwapper = await deployAutoSwapperL1(factory.address, sdex.address, staking.address, smardexRouter.address);
+
+  return {
+    token0,
+    token1,
+    WETH,
+    WETHPartner,
+    factory,
+    smardexRouter,
+    pair,
+    WETHPair,
+    routerEventEmitter,
+    autoSwapper,
+  };
+}
+
+export async function unitFixtureSmardexRouterWhitelist() {
+  const { token0, token1, WETH } = await unitFixtureCommon(constants.MaxUint256);
+  const factoryV1 = await deploySmardexFactoryV1();
+  const factory = await deploySmardexFactoryTest();
+  const smardexRouterV2 = await deploySmardexRouterV2WithV1Factory(factoryV1, WETH);
+  const smardexRouterTest = await deploySmardexRouterTest(factory, WETH);
+
+  const pair = await deployV1Pair(token0, token1, factoryV1, smardexRouterV2);
+  // Add liquidity to pair
+  await smardexRouterV2.addLiquidity(
+    {
+      tokenA: token0.address,
+      tokenB: token1.address,
+      amountADesired: 100_000,
+      amountBDesired: 100_000,
+      amountAMin: constants.Zero,
+      amountBMin: constants.Zero,
+      fictiveReserveB: constants.Zero,
+      fictiveReserveAMin: constants.Zero,
+      fictiveReserveAMax: constants.Zero,
+    },
+    (
+      await ethers.getSigners()
+    )[0].address,
+    constants.MaxUint256,
+  );
+  // Migrate pair to new factory
+  await factory.addPair(pair.address);
+
+  return {
+    token0,
+    token1,
+    WETH,
+    factoryV1,
+    factory,
+    smardexRouterV2,
+    smardexRouterTest,
+    pair,
+  };
+}
+
+export async function unitFixtureCallbackTest() {
+  const { token0, token1, WETH } = await unitFixtureCommon(parseEther("10000000"));
   await WETH.deposit({ value: parseEther("10") });
   const factory = await deploySmardexFactory();
+  await factory.closeWhitelist();
   const smardexRouter = await deploySmardexRouter(factory, WETH);
+
   const smardexRouterCallbackTest = await deployCallbackTestRouter(factory, WETH);
   const fakeERC20reentrancy = await deployFakeERC20reentrancy(factory, WETH);
   const pair = await deploySmardexPair(factory, token0, token1);
@@ -250,7 +464,30 @@ export async function unitFixtureCallbackTest(): Promise<UnitFixtureCallbackTest
   };
 }
 
-export async function unitFixtureTokensAndPairWithFactory(factory: SmardexFactory) {
+export async function unitFixtureCallbackTestV1() {
+  const { token0, token1, WETH } = await unitFixtureCommon(parseEther("10000000"));
+  await WETH.deposit({ value: parseEther("10") });
+  const factory = await deploySmardexFactoryV1();
+
+  const smardexRouter = await deploySmardexRouterV2WithV1Factory(factory, WETH);
+
+  const smardexRouterCallbackTest = await deployCallbackTestRouterV2(factory, WETH);
+  const fakeERC20reentrancy = await deployFakeERC20reentrancyV2(factory, WETH);
+  const pair = await deploySmardexPairV1(factory, token0, token1);
+
+  return {
+    token0,
+    token1,
+    factory,
+    smardexRouter,
+    smardexRouterCallbackTest,
+    pair,
+    fakeERC20reentrancy,
+    WETH,
+  };
+}
+
+export async function unitFixtureTokensAndPairWithFactory(factory: SmardexFactory | SmardexFactoryV1) {
   const [token0, token1] = await deployOrderedPairOfERC20(parseEther("10000000"));
   const pair = await deploySmardexPair(factory, token0, token1);
 
@@ -261,36 +498,7 @@ export async function unitFixtureTokensAndPairWithFactory(factory: SmardexFactor
   };
 }
 
-export type UnitFixtureFarmingRangeTokens = {
-  stakingTokenAsDeployer: ERC20Test;
-  stakingTokenAsAlice: ERC20Test;
-  stakingTokenAsBob: ERC20Test;
-  stakingTokenAsCat: ERC20Test;
-  rewardTokenAsDeployer: SmardexTokenTest;
-  rewardToken2AsDeployer: SmardexTokenTest;
-  stakingToken: ERC20Test;
-  rewardToken: SmardexTokenTest;
-  rewardToken2: SmardexTokenTest;
-  deployer: Signer;
-  alice: Signer;
-  bob: Signer;
-  cat: Signer;
-};
-
-export type UnitFixtureFarmingRangeSigners = {
-  farmingRangeAsDeployer: FarmingRange;
-  farmingRangeAsAlice: FarmingRange;
-  farmingRangeAsBob: FarmingRange;
-  farmingRangeAsCat: FarmingRange;
-  mockedBlock: BigNumber;
-};
-
-export type UnitFixtureFarmingRange = UnitFixtureFarmingRangeTokens &
-  UnitFixtureFarmingRangeSigners & {
-    farmingRange: FarmingRange;
-  };
-
-async function setupFarmingRangeTokens(): Promise<UnitFixtureFarmingRangeTokens> {
+async function setupFarmingRangeTokens() {
   const signers = await ethers.getSigners();
   const [deployer, alice, bob, cat] = signers;
   const stakingToken = await deployERC20Test(constants.Zero);
@@ -320,10 +528,10 @@ async function setupFarmingRangeTokens(): Promise<UnitFixtureFarmingRangeTokens>
   };
 }
 
-export async function unitFixtureFarmingRange(): Promise<UnitFixtureFarmingRange> {
-  const tokens: UnitFixtureFarmingRangeTokens = await setupFarmingRangeTokens();
-  const farmingRange: FarmingRange = await deployFarmingRange(tokens.deployer);
-  const signers: UnitFixtureFarmingRangeSigners = await setupFarmingRangeSigners(tokens, farmingRange);
+export async function unitFixtureFarmingRange() {
+  const tokens = await setupFarmingRangeTokens();
+  const farmingRange = await deployFarmingRange(tokens.deployer);
+  const signers = await setupFarmingRangeSigners(tokens, farmingRange);
 
   return {
     ...tokens,
@@ -332,10 +540,10 @@ export async function unitFixtureFarmingRange(): Promise<UnitFixtureFarmingRange
   };
 }
 
-export async function unitFixtureFarmingRangeL2Arbitrum(): Promise<UnitFixtureFarmingRange> {
-  const tokens: UnitFixtureFarmingRangeTokens = await setupFarmingRangeTokens();
-  const farmingRangeL2Arbitrum: FarmingRangeL2Arbitrum = await deployFarmingRangeL2Arbitrum(tokens.deployer);
-  const signers: UnitFixtureFarmingRangeSigners = await setupFarmingRangeSigners(tokens, farmingRangeL2Arbitrum);
+export async function unitFixtureFarmingRangeL2Arbitrum() {
+  const tokens = await setupFarmingRangeTokens();
+  const farmingRangeL2Arbitrum = await deployFarmingRangeL2Arbitrum(tokens.deployer);
+  const signers = await setupFarmingRangeSigners(tokens, farmingRangeL2Arbitrum);
 
   return {
     ...tokens,
@@ -345,9 +553,9 @@ export async function unitFixtureFarmingRangeL2Arbitrum(): Promise<UnitFixtureFa
 }
 
 async function setupFarmingRangeSigners(
-  fixtures: UnitFixtureFarmingRangeTokens,
+  fixtures: Awaited<ReturnType<typeof setupFarmingRangeTokens>>,
   farmingRange: FarmingRange,
-): Promise<UnitFixtureFarmingRangeSigners> {
+) {
   await fixtures.rewardTokenAsDeployer.approve(farmingRange.address, constants.MaxUint256);
   await fixtures.rewardToken2AsDeployer.approve(farmingRange.address, constants.MaxUint256);
   const mockedBlock = await latestBlockNumber();
@@ -368,7 +576,7 @@ async function setupFarmingRangeSigners(
 }
 
 export async function unitFixtureCampaignWith2rewards(
-  farming: UnitFixtureFarmingRange,
+  farming: Awaited<ReturnType<typeof unitFixtureFarmingRange>>,
   signer: Signer,
   initialBonusPerBlock: BigNumber,
   expect?: (val: any, message?: string | undefined) => Chai.Assertion,
@@ -394,25 +602,13 @@ export async function unitFixtureCampaignWith2rewards(
   return length;
 }
 
-type UnitFixtureStaking = {
-  smardexTokenTest: SmardexTokenTest;
-  staking: Staking;
-  farming: FarmingRange;
-  startBlockFarming: BigNumber;
-  checkBlockTest: CheckBlockTest;
-};
-
-export async function unitFixtureStaking(): Promise<UnitFixtureStaking> {
+export async function unitFixtureStaking() {
   const signers = await ethers.getSigners();
   const deployer = signers[0];
-  const smardexTokenTest: SmardexTokenTest = await deploySmardexToken(
-    "Smardex Token Test",
-    "SDEX",
-    parseEther("10000"),
-  );
+  const smardexTokenTest = await deploySmardexToken("Smardex Token Test", "SDEX", parseEther("10000"));
   const farming = await deployFarmingRange(deployer);
-  const staking: Staking = await deployStaking(smardexTokenTest.address, farming.address);
-  const checkBlockTest: CheckBlockTest = await deployCheckBlockTest(staking.address, smardexTokenTest.address);
+  const staking = await deployStaking(smardexTokenTest.address, farming.address);
+  const checkBlockTest = await deployCheckBlockTest(staking.address, smardexTokenTest.address);
 
   await smardexTokenTest.approve(staking.address, constants.MaxUint256);
   await smardexTokenTest.approve(farming.address, constants.MaxUint256);
@@ -454,20 +650,7 @@ async function initializeFarmingCampaign(
   await farming.addRewardInfo(0, startBlock.add(20), nextPeriodRewardPerBlock);
 }
 
-type UnitFixtureAutoSwapperData = {
-  token0: ERC20Test;
-  token1: ERC20Test;
-  WETH: WETH9;
-  WETHPartner: ERC20Test;
-  factory: SmardexFactory;
-  smardexRouter: SmardexRouter;
-  pair: SmardexPair;
-  WETHPair: SmardexPair;
-  routerEventEmitter: RouterEventEmitter;
-  smardexToken: ERC20Test;
-};
-
-async function unitFixtureAutoSwapperData(): Promise<UnitFixtureAutoSwapperData> {
+async function unitFixtureAutoSwapperData() {
   const fixtures = await unitFixtureSmardexRouter();
   return {
     ...fixtures,
@@ -475,16 +658,27 @@ async function unitFixtureAutoSwapperData(): Promise<UnitFixtureAutoSwapperData>
   };
 }
 
-export type UnitFixtureAutoSwapper = UnitFixtureAutoSwapperData & {
-  autoSwapper: AutoSwapper | AutoSwapperL2;
-};
-
-export async function unitFixtureAutoSwapperL1(): Promise<UnitFixtureAutoSwapper> {
+export async function unitFixtureAutoSwapperL1() {
   const fixtures = await unitFixtureAutoSwapperData();
   const autoSwapper = await deployAutoSwapperL1(
     fixtures.factory.address,
     fixtures.token0.address,
     fixtures.factory.address,
+    fixtures.smardexRouter.address,
+  );
+
+  return {
+    ...fixtures,
+    autoSwapper,
+  };
+}
+
+export async function unitFixtureAutoSwapperL2() {
+  const fixtures = await unitFixtureAutoSwapperData();
+  const autoSwapper = await deployAutoSwapperL2(
+    fixtures.factory.address,
+    fixtures.token0.address,
+    fixtures.smardexRouter.address,
   );
   return {
     ...fixtures,
@@ -492,21 +686,7 @@ export async function unitFixtureAutoSwapperL1(): Promise<UnitFixtureAutoSwapper
   };
 }
 
-export async function unitFixtureAutoSwapperL2(): Promise<UnitFixtureAutoSwapper> {
-  const fixtures = await unitFixtureAutoSwapperData();
-  const autoSwapper = await deployAutoSwapperL2(fixtures.factory.address, fixtures.token0.address);
-  return {
-    ...fixtures,
-    autoSwapper,
-  };
-}
-
-type UnitFixtureRewardManagerData = {
-  stakingToken: ERC20Test;
-  tether: TetherToken;
-};
-
-async function unitFixtureRewardManagerData(): Promise<UnitFixtureRewardManagerData> {
+async function unitFixtureRewardManagerData() {
   const stakingToken = await deployERC20Test(parseEther("10000"));
   const tether = await deployTetherToken();
 
@@ -516,15 +696,10 @@ async function unitFixtureRewardManagerData(): Promise<UnitFixtureRewardManagerD
   };
 }
 
-export type UnitFixtureRewardManagerTest = UnitFixtureRewardManagerData & {
-  mockedBlock: BigNumber;
-  rewardManagerTest: RewardManagerTest | RewardManagerTestL2 | RewardManagerTestL2Arbitrum;
-};
-
-export async function unitFixtureRewardManagerTestL1(): Promise<UnitFixtureRewardManagerTest> {
+export async function unitFixtureRewardManagerTestL1() {
   const fixtures = await unitFixtureRewardManagerData();
   const mockedBlock = await latestBlockNumber();
-  const rewardManagerTest: RewardManagerTest = await deployRewardManagerTest(
+  const rewardManagerTest = await deployRewardManagerTest(
     (
       await ethers.getSigners()
     )[0],
@@ -539,10 +714,10 @@ export async function unitFixtureRewardManagerTestL1(): Promise<UnitFixtureRewar
   };
 }
 
-export async function unitFixtureRewardManagerTestL2(): Promise<UnitFixtureRewardManagerTest> {
+export async function unitFixtureRewardManagerTestL2() {
   const fixtures = await unitFixtureRewardManagerData();
   const mockedBlock = await latestBlockNumber();
-  const rewardManagerTest: RewardManagerTestL2 = await deployRewardManagerTestL2((await ethers.getSigners())[0]);
+  const rewardManagerTest = await deployRewardManagerTestL2((await ethers.getSigners())[0]);
   const farmingAddress = await rewardManagerTest.farming();
   const farmingFactory = await ethers.getContractFactory("FarmingRange");
   const farming = farmingFactory.attach(farmingAddress);
@@ -555,13 +730,9 @@ export async function unitFixtureRewardManagerTestL2(): Promise<UnitFixtureRewar
   };
 }
 
-export async function unitFixtureRewardManagerTestL2Arbitrum(): Promise<UnitFixtureRewardManagerTest> {
+export async function unitFixtureRewardManagerTestL2Arbitrum() {
   const fixtures = await unitFixtureRewardManagerData();
-  const rewardManagerTest: RewardManagerTestL2Arbitrum = await deployRewardManagerTestL2Arbitrum(
-    (
-      await ethers.getSigners()
-    )[0],
-  );
+  const rewardManagerTest = await deployRewardManagerTestL2Arbitrum((await ethers.getSigners())[0]);
   const mockedBlock = await latestBlockNumberL2Arbitrum();
   const farmingAddress = await rewardManagerTest.farming();
   const farmingFactory = await ethers.getContractFactory("FarmingRangeL2Arbitrum");
@@ -572,5 +743,36 @@ export async function unitFixtureRewardManagerTestL2Arbitrum(): Promise<UnitFixt
     ...fixtures,
     rewardManagerTest,
     mockedBlock,
+  };
+}
+
+async function unitFixtureFluid(amount: BigNumber) {
+  const [fluidToken0, fluidToken1] = await deployOrderedPairFluid(amount);
+  const WETH = await deployWETH9();
+
+  return {
+    fluidToken0,
+    fluidToken1,
+    WETH,
+  };
+}
+
+export async function unitFixtureSmardexRouterFluid() {
+  const { fluidToken0, fluidToken1, WETH } = await unitFixtureFluid(constants.MaxUint256);
+
+  const factoryTest = await deploySmardexFactoryTest();
+  await factoryTest.closeWhitelist();
+  const pairTest = await deploySmardexPairFluid(factoryTest, fluidToken0, fluidToken1);
+
+  const smardexRouterTest = await deploySmardexRouterTest(factoryTest, WETH);
+  await smardexRouterTest.addPairToWhitelist(fluidToken0.address, fluidToken1.address);
+
+  return {
+    fluidToken0,
+    fluidToken1,
+    factoryTest,
+    pairTest,
+    smardexRouterTest,
+    WETH,
   };
 }

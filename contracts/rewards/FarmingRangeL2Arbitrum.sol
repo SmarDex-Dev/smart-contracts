@@ -55,15 +55,25 @@ contract FarmingRangeL2Arbitrum is FarmingRange, IFarmingRangeArbitrum {
             rewardInfo.length < rewardInfoLimit,
             "FarmingRange::addRewardInfo::reward info length exceeds the limit"
         );
-        require(
-            rewardInfo.length == 0 || rewardInfo[rewardInfo.length - 1].endBlock >= arbitrumBlockNumber(),
-            "FarmingRange::addRewardInfo::reward period ended"
-        );
-        require(
-            rewardInfo.length == 0 || rewardInfo[rewardInfo.length - 1].endBlock < _endBlock,
-            "FarmingRange::addRewardInfo::bad new endblock"
-        );
-        uint256 _startBlock = rewardInfo.length == 0 ? campaign.startBlock : rewardInfo[rewardInfo.length - 1].endBlock;
+
+        // assign last reward block by default
+        uint256 _startBlock = campaignInfo[_campaignID].lastRewardBlock;
+
+        uint256 _currentCampaignEnd = rewardInfo.length == 0
+            ? campaign.startBlock
+            : rewardInfo[rewardInfo.length - 1].endBlock;
+
+        if (_currentCampaignEnd < arbitrumBlockNumber()) {
+            require(_rewardPerBlock == 0, "FarmingRange::addRewardInfo::reward period ended");
+        }
+
+        // assign largest between endblock and lastRewardBlock
+        if (_startBlock < _currentCampaignEnd) {
+            _startBlock = _currentCampaignEnd;
+        }
+
+        require(_currentCampaignEnd < _endBlock, "FarmingRange::addRewardInfo::bad new endblock");
+
         uint256 _blockRange = _endBlock - _startBlock;
         uint256 _totalRewards = _rewardPerBlock * _blockRange;
         campaign.totalRewards = campaign.totalRewards + _totalRewards;
@@ -133,7 +143,7 @@ contract FarmingRangeL2Arbitrum is FarmingRange, IFarmingRangeArbitrum {
     }
 
     /// @inheritdoc FarmingRange
-    function removeLastRewardInfo(uint256 _campaignID) external override onlyOwner {
+    function removeLastRewardInfo(uint256 _campaignID) public override onlyOwner {
         RewardInfo[] storage rewardInfo = campaignRewardInfo[_campaignID];
         CampaignInfo storage campaign = campaignInfo[_campaignID];
         uint256 _rewardInfoLength = rewardInfo.length;

@@ -68,11 +68,12 @@ interface IFarmingRange {
 
     /**
      * @notice emitted at each withdraw
-     * @param user address that withdrawn its funds
+     * @param _rewardTo address to which the reward tokens will be sent
+     * @param _stakingTo address to which the staking tokens will be sent
      * @param amount amount withdrawn
-     * @param campaign campaingId on which the user has withdrawn funds
+     * @param campaign campaingId on which the user has deposited funds
      */
-    event Withdraw(address indexed user, uint256 amount, uint256 campaign);
+    event Withdraw(address indexed _rewardTo, address indexed _stakingTo, uint256 amount, uint256 campaign);
 
     /**
      * @notice emitted at each emergency withdraw
@@ -208,6 +209,13 @@ interface IFarmingRange {
     function removeLastRewardInfo(uint256 _campaignID) external;
 
     /**
+     * @notice remove the _number last RewardInfos for specified campaign.
+     * @param _campaignID campaign id
+     * @param _number number of RewardInfos to remove
+     */
+    function removeLastRewardInfoMultiple(uint256 _campaignID, uint256 _number) external;
+
+    /**
      * @notice return the entries amount of reward info for one campaign.
      * @param _campaignID campaign id
      * @return reward info quantity
@@ -267,8 +275,9 @@ interface IFarmingRange {
      * @notice Deposit staking token in a campaign.
      * @param _campaignID campaign id
      * @param _amount amount to deposit
+     * @param _for address to deposit for
      */
-    function deposit(uint256 _campaignID, uint256 _amount) external;
+    function deposit(uint256 _campaignID, uint256 _amount, address _for) external;
 
     /**
      * @notice Deposit staking token in a campaign with the EIP-2612 signature off chain
@@ -294,14 +303,17 @@ interface IFarmingRange {
      * @notice Withdraw staking token in a campaign. Also withdraw the current pending reward
      * @param _campaignID campaign id
      * @param _amount amount to withdraw
+     * @param _rewardTo address to which the reward tokens will be sent
+     * @param _stakingTo address to which the staking tokens will be sent
      */
-    function withdraw(uint256 _campaignID, uint256 _amount) external;
+    function withdraw(uint256 _campaignID, uint256 _amount, address _rewardTo, address _stakingTo) external;
 
     /**
      * @notice Harvest campaigns, will claim rewards token of every campaign ids in the array
      * @param _campaignIDs array of campaign id
+     * @param _rewardTo address to which the reward tokens will be sent
      */
-    function harvest(uint256[] calldata _campaignIDs) external;
+    function harvest(uint256[] calldata _campaignIDs, address _rewardTo) external;
 
     /**
      * @notice Withdraw without caring about rewards. EMERGENCY ONLY.

@@ -2,8 +2,7 @@
 
 ### Requirements
 
-caution: please remember to set startBlockStaking in 004_reward_manager
-for mainnet then uncomment related throw in 001_smardex_factory.
+caution: please remember to set startBlockStaking in params file
 
 ### Setup
 
@@ -69,7 +68,7 @@ a chain object must be placed in deploy/utils.ts inside chainsData variable as t
 yarn deploy_ethereum
 
 // or by tags
-yarn deploy --network ethereum --tags SmardexRouter,RewardManager,AutoSwapper // replace by tag name
+npx hardhat deploy --network ethereum --tags SmardexRouter,RewardManager,AutoSwapper // replace by tag name
 ```
 
 tags:
@@ -88,7 +87,7 @@ tags:
 yarn deploy_arbitrum
 
 // or by tag
-yarn deploy --network arbitrum --tags SmardexFactory // replace by tag name
+npx hardhat deploy --network arbitrum --tags SmardexFactory // replace by tag name
 ```
 
 tags:
@@ -96,8 +95,8 @@ tags:
 * *SmardexFactory*
 * *SmardexRouter*
 * *SmardexToken*
-* *RewardManagerL2Arbitrum* => (FarmingRangeL2Arbitrum)
-* AutoSwapperL2
+* *RewardManager* => (RewardManagerL2Arbitrum => FarmingRangeL2Arbitrum)
+* *AutoSwapper* => (AutoSwapperL2)
 * *Pairs*
 
 **BSC**
@@ -107,7 +106,7 @@ tags:
 yarn deploy_bsc
 
 // or by tag
-yarn deploy --network bsc --tags SmardexFactory // replace by tag name
+npx hardhat deploy --network bsc --tags SmardexFactory // replace by tag name
 ```
 
 tags:
@@ -115,8 +114,8 @@ tags:
 * *SmardexFactory*
 * *SmardexRouter*
 * *SmardexToken*
-* *RewardManagerL2* => (FarmingRange)
-* *AutoSwapperL2*
+* *RewardManager* => (RewardManagerL2 => FarmingRange)
+* *AutoSwapper* => (AutoSwapperL2)
 * *Pairs*
 
 **POLYGON**
@@ -126,7 +125,7 @@ tags:
 yarn deploy_polygon
 
 // or by tag
-yarn deploy --network polygon --tags SmardexFactory // replace by tag name
+npx hardhat deploy --network polygon --tags SmardexFactory // replace by tag name
 ```
 
 tags:
@@ -134,6 +133,6 @@ tags:
 * *SmardexFactory*
 * *SmardexRouter*
 * *SmardexToken*
-* *RewardManagerL2* => (FarmingRange)
-* *AutoSwapperL2*
+* *RewardManager* => (RewardManagerL2 => FarmingRange)
+* *AutoSwapper* => (AutoSwapperL2)
 * *Pairs*

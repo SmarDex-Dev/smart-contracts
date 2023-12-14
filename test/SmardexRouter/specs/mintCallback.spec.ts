@@ -1,6 +1,7 @@
 import { expect } from "chai";
 import { constants } from "ethers";
 import { parseEther } from "ethers/lib/utils";
+import { SmardexPair, SmardexPairV1 } from "../../../typechain";
 
 export function shouldBehaveLikeMintCallback() {
   const TOKEN0_AMOUNT = parseEther("10");
@@ -9,12 +10,17 @@ export function shouldBehaveLikeMintCallback() {
 
   it("should addLiquidity with MintCallback and fail with missing tokens", async function () {
     await this.contracts.smardexRouter.addLiquidity(
-      this.contracts.token0.address,
-      this.contracts.token1.address,
-      TOKEN0_AMOUNT,
-      TOKEN1_AMOUNT,
-      0,
-      0,
+      {
+        tokenA: this.contracts.token0.address,
+        tokenB: this.contracts.token1.address,
+        amountADesired: TOKEN0_AMOUNT,
+        amountBDesired: TOKEN1_AMOUNT,
+        amountAMin: 0,
+        amountBMin: 0,
+        fictiveReserveB: 0,
+        fictiveReserveAMin: 0,
+        fictiveReserveAMax: 0,
+      },
       this.signers.admin.address,
       constants.MaxUint256,
     );
@@ -35,7 +41,12 @@ export function shouldBehaveLikeMintCallback() {
       constants.MaxUint256,
     );
     // get fees
-    const feeToAmount = await this.contracts.smardexPair.getFeeToAmounts();
+    let feeToAmount;
+    try {
+      feeToAmount = await (this.contracts.smardexPair as SmardexPair).getFeeToAmounts();
+    } catch {
+      feeToAmount = await (this.contracts.smardexPair as SmardexPairV1).getFees();
+    }
     expect(feeToAmount.fees0_).to.be.gt(0);
     expect(feeToAmount.fees1_).to.be.gt(0);
     await expect(
@@ -70,12 +81,17 @@ export function shouldBehaveLikeMintCallback() {
     await this.contracts.WETH.approve(this.contracts.smardexRouter.address, constants.MaxUint256);
     await this.contracts.WETH.approve(this.contracts.fakeERC20reentrancy.address, TOKEN0_AMOUNT.add(TOKEN0_AMOUNT));
     await this.contracts.smardexRouter.addLiquidity(
-      this.contracts.WETH.address,
-      this.contracts.fakeERC20reentrancy.address,
-      TOKEN0_AMOUNT,
-      TOKEN0_AMOUNT,
-      0,
-      0,
+      {
+        tokenA: this.contracts.WETH.address,
+        tokenB: this.contracts.fakeERC20reentrancy.address,
+        amountADesired: TOKEN0_AMOUNT,
+        amountBDesired: TOKEN0_AMOUNT,
+        amountAMin: 0,
+        amountBMin: 0,
+        fictiveReserveB: 0,
+        fictiveReserveAMin: 0,
+        fictiveReserveAMax: 0,
+      },
       this.signers.admin.address,
       constants.MaxUint256,
     );

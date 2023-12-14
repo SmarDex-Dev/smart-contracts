@@ -27,7 +27,7 @@ export function shouldBehaveLikeEmergencyWithdraw() {
       // alice & bob approve farming range
       await this.farming.stakingTokenAsAlice.approve(this.farming.farmingRange.address, parseEther("100"));
       // alice deposit @block number #(mockedBlock+9)
-      await this.farming.farmingRangeAsAlice.deposit(constants.Zero, parseEther("100"));
+      await this.farming.farmingRangeAsAlice.deposit(constants.Zero, parseEther("100"), this.signers.user.address);
       expect(await this.farming.stakingToken.balanceOf(this.signers.user.address)).to.eq(constants.Zero);
       // alice withdraw from the campaign
       await this.farming.farmingRangeAsAlice.emergencyWithdraw(constants.Zero);
@@ -56,7 +56,7 @@ export function shouldBehaveLikeEmergencyWithdraw() {
       // alice & bob approve farming range
       await this.farming.stakingTokenAsAlice.approve(this.farming.farmingRange.address, parseEther("100"));
       // alice deposit @block number #(mockedBlock+9)
-      await this.farming.farmingRangeAsAlice.deposit(constants.Zero, parseEther("100"));
+      await this.farming.farmingRangeAsAlice.deposit(constants.Zero, parseEther("100"), this.signers.user.address);
       let userInfo = await this.farming.farmingRangeAsAlice.userInfo(constants.Zero, this.signers.user.address);
       expect(await this.farming.stakingToken.balanceOf(this.signers.user.address)).to.eq(constants.Zero);
       expect(userInfo.amount).to.eq(parseEther("100"));

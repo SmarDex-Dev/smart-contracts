@@ -1,15 +1,10 @@
 import { expect } from "chai";
 import { BigNumber, constants } from "ethers";
 import { hexConcat, parseEther } from "ethers/lib/utils";
-import {
-  AutoSwapper,
-  AutoSwapperL2,
-  AutoSwapper__factory,
-  ERC20Test,
-  SmardexPair__factory,
-  SmardexRouter,
-} from "../../../typechain";
+import { AutoSwapper, ERC20Test, SmardexPair, SmardexPair__factory, SmardexRouter } from "../../../typechain";
 import { getSwapEncodedData } from "../../utils";
+import { deployERC20Test } from "../../deployers";
+import { deployPool } from "../utils";
 
 async function addLiquidity(
   token0Amount: BigNumber,
@@ -20,12 +15,17 @@ async function addLiquidity(
   adminAddress: string,
 ) {
   await router.addLiquidity(
-    token0.address,
-    token1.address,
-    token0Amount,
-    token1Amount,
-    1,
-    1,
+    {
+      tokenA: token0.address,
+      tokenB: token1.address,
+      amountADesired: token0Amount,
+      amountBDesired: token1Amount,
+      amountAMin: 1,
+      amountBMin: 1,
+      fictiveReserveB: 0,
+      fictiveReserveAMin: 0,
+      fictiveReserveAMax: 0,
+    },
     adminAddress,
     constants.MaxUint256,
   );
@@ -82,9 +82,11 @@ export function shouldBehaveLikeAutoSwapper() {
           expect(await this.contracts.smardexFactory.feeTo()).to.eq(this.contracts.autoSwapper.address);
           // staking address is factory contract as we did not deploy a staking contract for unit tests
           try {
-            const stakingAddress = await (<AutoSwapper>this.contracts.autoSwapper).stakingAddress();
+            const stakingAddress = await (this.contracts.autoSwapper as AutoSwapper).stakingAddress();
             expect(stakingAddress).to.eq(this.misc.targetAddress);
-          } catch (e) {}
+          } catch (e) {
+            // do nothing
+          }
           expect(await this.contracts.autoSwapper.smardexToken()).to.eq(this.contracts.smardexToken.address);
           expect(this.contracts.smardexToken.address).to.eq(this.contracts.token0.address);
         });
@@ -128,7 +130,7 @@ export function shouldBehaveLikeAutoSwapper() {
             this.contracts.token1,
             this.signers.admin.address,
           );
-          const [fee0, fee1] = await this.contracts.smardexPair.getFeeToAmounts();
+          const [fee0, fee1] = await (this.contracts.smardexPair as SmardexPair).getFeeToAmounts();
           expect(fee0).to.not.eq(0);
           expect(fee1).to.not.eq(0);
 
@@ -146,7 +148,7 @@ export function shouldBehaveLikeAutoSwapper() {
           );
 
           // We can not check for feeToAmount after burn or mint because we swapped in pair so feeToAmount increased again
-          const [fee0After, fee1After] = await this.contracts.smardexPair.getFeeToAmounts();
+          const [fee0After, fee1After] = await (this.contracts.smardexPair as SmardexPair).getFeeToAmounts();
           expect(fee0After).to.eq(0);
           expect(fee1After).to.not.eq(0);
 
@@ -193,18 +195,23 @@ export function shouldBehaveLikeAutoSwapper() {
 
             await expect(
               this.contracts.smardexRouter.addLiquidity(
-                this.contracts.token0.address,
-                this.contracts.token1.address,
-                SDEXAmount.div(10),
-                TOKEN1Amount.div(10),
-                1,
-                1,
+                {
+                  tokenA: this.contracts.token0.address,
+                  tokenB: this.contracts.token1.address,
+                  amountADesired: SDEXAmount.div(10),
+                  amountBDesired: TOKEN1Amount.div(10),
+                  amountAMin: 1,
+                  amountBMin: 1,
+                  fictiveReserveB: 0,
+                  fictiveReserveAMin: 0,
+                  fictiveReserveAMax: 0,
+                },
                 this.signers.admin.address,
                 constants.MaxUint256,
               ),
             ).to.not.be.reverted;
           }
-          const [fee0, fee1] = await this.contracts.smardexPair.getFeeToAmounts();
+          const [fee0, fee1] = await (this.contracts.smardexPair as SmardexPair).getFeeToAmounts();
           expect(fee0).to.eq(0);
           expect(fee1).to.not.eq(0);
         });
@@ -213,12 +220,17 @@ export function shouldBehaveLikeAutoSwapper() {
         it("should fail (but not revert) because there are no pair corresponding with SDEX", async function () {
           await this.contracts.WETHPartner.approve(this.contracts.smardexRouter.address, parseEther("10000"));
           await this.contracts.smardexRouter.addLiquidity(
-            this.contracts.WETHPartner.address,
-            this.contracts.token1.address,
-            TenTokens,
-            TenTokens,
-            1,
-            1,
+            {
+              tokenA: this.contracts.WETHPartner.address,
+              tokenB: this.contracts.token1.address,
+              amountADesired: TenTokens,
+              amountBDesired: TenTokens,
+              amountAMin: 1,
+              amountBMin: 1,
+              fictiveReserveB: 0,
+              fictiveReserveAMin: 0,
+              fictiveReserveAMax: 0,
+            },
             this.signers.admin.address,
             constants.MaxUint256,
           );
@@ -285,23 +297,33 @@ export function shouldBehaveLikeAutoSwapper() {
           // We now need to complementary pairs : TokenX / Token1 & TokenX / SDEX,
           // and mint or burn after a swap on  TokenX / Token1 to use other SDEX pairs to swap fees
           await this.contracts.smardexRouter.addLiquidity(
-            this.contracts.WETHPartner.address,
-            this.contracts.token1.address,
-            TenTokens,
-            TenTokens,
-            1,
-            1,
+            {
+              tokenA: this.contracts.WETHPartner.address,
+              tokenB: this.contracts.token1.address,
+              amountADesired: TenTokens,
+              amountBDesired: TenTokens,
+              amountAMin: 1,
+              amountBMin: 1,
+              fictiveReserveB: 0,
+              fictiveReserveAMin: 0,
+              fictiveReserveAMax: 0,
+            },
             this.signers.admin.address,
             constants.MaxUint256,
           );
 
           await this.contracts.smardexRouter.addLiquidity(
-            this.contracts.WETHPartner.address,
-            this.contracts.smardexToken.address,
-            TenTokens,
-            TenTokens,
-            1,
-            1,
+            {
+              tokenA: this.contracts.WETHPartner.address,
+              tokenB: this.contracts.smardexToken.address,
+              amountADesired: TenTokens,
+              amountBDesired: TenTokens,
+              amountAMin: 1,
+              amountBMin: 1,
+              fictiveReserveB: 0,
+              fictiveReserveAMin: 0,
+              fictiveReserveAMax: 0,
+            },
             this.signers.admin.address,
             constants.MaxUint256,
           );
@@ -367,23 +389,33 @@ export function shouldBehaveLikeAutoSwapper() {
           // We now need to complementary pairs : TokenX / Token1 & TokenX / SDEX,
           // and mint or burn after a swap on  TokenX / Token1 to use other SDEX pairs to swap fees
           await this.contracts.smardexRouter.addLiquidity(
-            this.contracts.WETHPartner.address,
-            this.contracts.token1.address,
-            TenTokens,
-            TenTokens,
-            1,
-            1,
+            {
+              tokenA: this.contracts.WETHPartner.address,
+              tokenB: this.contracts.token1.address,
+              amountADesired: TenTokens,
+              amountBDesired: TenTokens,
+              amountAMin: 1,
+              amountBMin: 1,
+              fictiveReserveB: 0,
+              fictiveReserveAMin: 0,
+              fictiveReserveAMax: 0,
+            },
             this.signers.admin.address,
             constants.MaxUint256,
           );
 
           await this.contracts.smardexRouter.addLiquidity(
-            this.contracts.WETHPartner.address,
-            this.contracts.smardexToken.address,
-            parseEther("1"),
-            TenTokens,
-            1,
-            1,
+            {
+              tokenA: this.contracts.WETHPartner.address,
+              tokenB: this.contracts.smardexToken.address,
+              amountADesired: parseEther("1"),
+              amountBDesired: TenTokens,
+              amountAMin: 1,
+              amountBMin: 1,
+              fictiveReserveB: 0,
+              fictiveReserveAMin: 0,
+              fictiveReserveAMax: 0,
+            },
             this.signers.admin.address,
             constants.MaxUint256,
           );
@@ -462,23 +494,33 @@ export function shouldBehaveLikeAutoSwapper() {
           // We now need to complementary pairs : TokenX / Token1 & TokenX / SDEX,
           // and mint or burn after a swap on  TokenX / Token1 to use other SDEX pairs to swap fees
           await this.contracts.smardexRouter.addLiquidity(
-            this.contracts.WETHPartner.address,
-            this.contracts.token1.address,
-            TenTokens,
-            TenTokens,
-            1,
-            1,
+            {
+              tokenA: this.contracts.WETHPartner.address,
+              tokenB: this.contracts.token1.address,
+              amountADesired: TenTokens,
+              amountBDesired: TenTokens,
+              amountAMin: 1,
+              amountBMin: 1,
+              fictiveReserveB: 0,
+              fictiveReserveAMin: 0,
+              fictiveReserveAMax: 0,
+            },
             this.signers.admin.address,
             constants.MaxUint256,
           );
 
           await this.contracts.smardexRouter.addLiquidity(
-            this.contracts.WETHPartner.address,
-            this.contracts.smardexToken.address,
-            TenTokens,
-            TenTokens,
-            1,
-            1,
+            {
+              tokenA: this.contracts.WETHPartner.address,
+              tokenB: this.contracts.smardexToken.address,
+              amountADesired: TenTokens,
+              amountBDesired: TenTokens,
+              amountAMin: 1,
+              amountBMin: 1,
+              fictiveReserveB: 0,
+              fictiveReserveAMin: 0,
+              fictiveReserveAMax: 0,
+            },
             this.signers.admin.address,
             constants.MaxUint256,
           );
@@ -558,6 +600,116 @@ export function shouldBehaveLikeAutoSwapper() {
           const balanceAfter = await this.contracts.smardexToken.balanceOf(this.misc.targetAddress);
 
           expect(balanceAfter).to.eq(balanceBefore);
+        });
+      });
+      context("when manually swapping with path", function () {
+        it("should fail if not owner", async function () {
+          await expect(
+            this.contracts.autoSwapper.connect(this.signers.user).swapTokenWithPath("1", "1", [], "0"),
+          ).to.revertedWith("Ownable: caller is not the owner");
+        });
+
+        it("should fail if last token in path isn't SDEX", async function () {
+          const token1Addr = this.contracts.token1.address;
+          const SDEXAddr = this.contracts.smardexToken.address;
+          await expect(
+            this.contracts.autoSwapper.swapTokenWithPath(
+              "1",
+              "1",
+              [token1Addr, SDEXAddr, token1Addr],
+              constants.MaxUint256,
+            ),
+          ).to.revertedWith("AutoSwapper: INVALID_LAST_TOKEN");
+        });
+
+        it("should fail if path < 2", async function () {
+          await expect(
+            this.contracts.autoSwapper.swapTokenWithPath("1", "1", [], constants.MaxUint256),
+          ).to.revertedWith("AutoSwapper: INVALID_PATH");
+
+          await expect(
+            this.contracts.autoSwapper.swapTokenWithPath("1", "1", [this.contracts.WETH.address], constants.MaxUint256),
+          ).to.revertedWith("AutoSwapper: INVALID_PATH");
+        });
+
+        it("should fail if amount > balance", async function () {
+          await expect(
+            this.contracts.autoSwapper.swapTokenWithPath(
+              "1",
+              "1",
+              [this.contracts.token1.address, this.contracts.smardexToken.address],
+              constants.MaxUint256,
+            ),
+          ).to.revertedWith("AutoSwapper: INVALID_AMOUNT");
+        });
+
+        it("should swap balance and send to stakingPool/burn with simple path", async function () {
+          const token1 = this.contracts.token1;
+          const SDEXToken = this.contracts.smardexToken;
+          await token1.transfer(this.contracts.autoSwapper.address, parseEther("1"));
+          const balSDEXStakingBefore = await SDEXToken.balanceOf(this.misc.targetAddress);
+
+          await this.contracts.autoSwapper.swapTokenWithPath(
+            "0",
+            "1",
+            [token1.address, SDEXToken.address],
+            constants.MaxUint256,
+          );
+
+          const balToken1SwapperAfter = await token1.balanceOf(this.contracts.autoSwapper.address);
+          const balSDEXStakingAfter = await SDEXToken.balanceOf(this.misc.targetAddress);
+
+          expect(balToken1SwapperAfter).to.eq(0);
+          expect(balSDEXStakingAfter).to.be.gt(balSDEXStakingBefore);
+        });
+
+        it("should swap amount and send to stakingPool/burn with simple path", async function () {
+          const token1 = this.contracts.token1;
+          const SDEXToken = this.contracts.smardexToken;
+          await token1.transfer(this.contracts.autoSwapper.address, parseEther("1"));
+          const balSDEXStakingBefore = await SDEXToken.balanceOf(this.misc.targetAddress);
+
+          await this.contracts.autoSwapper.swapTokenWithPath(
+            "1000",
+            "1",
+            [token1.address, SDEXToken.address],
+            constants.MaxUint256,
+          );
+
+          const balToken1SwapperAfter = await token1.balanceOf(this.contracts.autoSwapper.address);
+          const balSDEXStakingAfter = await SDEXToken.balanceOf(this.misc.targetAddress);
+
+          expect(balToken1SwapperAfter).to.eq(parseEther("1").sub(1000));
+          expect(balSDEXStakingAfter).to.be.gt(balSDEXStakingBefore);
+        });
+
+        it("should swap and send to stakingPool/burn with complex path", async function () {
+          const token1 = this.contracts.token1;
+          const router = this.contracts.smardexRouter;
+          const SDEXToken = this.contracts.smardexToken;
+          const autoSwapper = this.contracts.autoSwapper;
+          const token2 = await deployERC20Test(constants.MaxUint256);
+          const token3 = await deployERC20Test(constants.MaxUint256);
+          await deployPool(token1, parseEther("4242"), token2, parseEther("5000"), router);
+          await deployPool(token2, parseEther("2121"), token3, parseEther("50000"), router);
+          await deployPool(token3, parseEther("66666"), SDEXToken, parseEther("99999"), router);
+
+          await token1.transfer(autoSwapper.address, parseEther("1"));
+
+          const balToken1SwapperBefore = await token1.balanceOf(autoSwapper.address);
+          const balSDEXStakingBefore = await SDEXToken.balanceOf(this.misc.targetAddress);
+
+          await autoSwapper.swapTokenWithPath(
+            balToken1SwapperBefore,
+            "1",
+            [token1.address, token2.address, token3.address, SDEXToken.address],
+            constants.MaxUint256,
+          );
+          const balToken1SwapperAfter = await token1.balanceOf(autoSwapper.address);
+          const balSDEXStakingAfter = await SDEXToken.balanceOf(this.misc.targetAddress);
+
+          expect(balToken1SwapperAfter).to.eq(0);
+          expect(balSDEXStakingAfter).to.be.gt(balSDEXStakingBefore);
         });
       });
     });

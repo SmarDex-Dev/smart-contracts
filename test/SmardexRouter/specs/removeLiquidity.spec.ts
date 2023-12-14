@@ -119,12 +119,17 @@ export function shouldBehaveLikeRemoveLiquidity(): void {
     await this.contracts.smardexPair.approve(this.contracts.smardexRouter.address, constants.MaxUint256);
 
     await this.contracts.smardexRouter.addLiquidity(
-      this.contracts.token0.address,
-      this.contracts.token1.address,
-      parseEther("0.000000000000001001"),
-      parseEther("0.000000000000001001"),
-      1,
-      1,
+      {
+        tokenA: this.contracts.token0.address,
+        tokenB: this.contracts.token1.address,
+        amountADesired: parseEther("0.000000000000001001"),
+        amountBDesired: parseEther("0.000000000000001001"),
+        amountAMin: 1,
+        amountBMin: 1,
+        fictiveReserveB: 0,
+        fictiveReserveAMin: 0,
+        fictiveReserveAMax: 0,
+      },
       this.signers.admin.address,
       constants.MaxUint256,
     );
@@ -157,12 +162,17 @@ export function shouldBehaveLikeRemoveLiquidity(): void {
     await this.contracts.smardexPair.approve(this.contracts.smardexRouter.address, constants.MaxUint256);
 
     await this.contracts.smardexRouter.addLiquidity(
-      this.contracts.token0.address,
-      this.contracts.token1.address,
-      MAX_UINT128,
-      MAX_UINT128,
-      1,
-      1,
+      {
+        tokenA: this.contracts.token0.address,
+        tokenB: this.contracts.token1.address,
+        amountADesired: MAX_UINT128,
+        amountBDesired: MAX_UINT128,
+        amountAMin: 1,
+        amountBMin: 1,
+        fictiveReserveB: 0,
+        fictiveReserveAMin: 0,
+        fictiveReserveAMax: 0,
+      },
       this.signers.admin.address,
       constants.MaxUint256,
     );
@@ -194,12 +204,17 @@ export function shouldBehaveLikeRemoveLiquidity(): void {
     await this.contracts.smardexPair.approve(this.contracts.smardexRouter.address, constants.MaxUint256);
 
     await this.contracts.smardexRouter.addLiquidity(
-      this.contracts.token0.address,
-      this.contracts.token1.address,
-      parseEther("0.000000000000000002"),
-      MAX_UINT128.mul(2),
-      1,
-      1,
+      {
+        tokenA: this.contracts.token0.address,
+        tokenB: this.contracts.token1.address,
+        amountADesired: parseEther("0.000000000000000002"),
+        amountBDesired: MAX_UINT128.mul(2),
+        amountAMin: 1,
+        amountBMin: 1,
+        fictiveReserveB: 0,
+        fictiveReserveAMin: 0,
+        fictiveReserveAMax: 0,
+      },
       this.signers.admin.address,
       constants.MaxUint256,
     );

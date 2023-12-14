@@ -3,6 +3,7 @@ import { parseEther } from "ethers/lib/utils";
 import { MAX_BLOCK_DIFF_SECONDS, FEES_LP, FEES_POOL } from "../../constants";
 import hre from "hardhat";
 import { BigNumber, constants } from "ethers";
+import { SmardexPair } from "../../../typechain";
 
 const getCalculatedAveragePrice = (timeDiff: BigNumber, oldPriceAverage: BigNumber, newPrice: BigNumber) =>
   MAX_BLOCK_DIFF_SECONDS.sub(timeDiff).mul(oldPriceAverage).add(timeDiff.mul(newPrice)).div(MAX_BLOCK_DIFF_SECONDS);
@@ -22,12 +23,17 @@ export function shouldBehaveLikeSmardexPairPriceAverage(): void {
       await this.contracts.token1.approve(this.contracts.smardexRouterTest.address, parseEther("100000"));
 
       await this.contracts.smardexRouterTest.addLiquidity(
-        this.contracts.token0.address,
-        this.contracts.token1.address,
-        parseEther("100000"),
-        parseEther("100000"), // price is 1:1
-        0,
-        0,
+        {
+          tokenA: this.contracts.token0.address,
+          tokenB: this.contracts.token1.address,
+          amountADesired: parseEther("100000"),
+          amountBDesired: parseEther("100000"), // price is 1:1
+          amountAMin: 0,
+          amountBMin: 0,
+          fictiveReserveB: 0,
+          fictiveReserveAMin: 0,
+          fictiveReserveAMax: 0,
+        },
         this.signers.admin.address,
         constants.MaxUint256,
       );
@@ -48,12 +54,17 @@ export function shouldBehaveLikeSmardexPairPriceAverage(): void {
         params: [block.timestamp + 12],
       });
       await this.contracts.smardexRouterTest.addLiquidity(
-        this.contracts.token0.address,
-        this.contracts.token1.address,
-        parseEther("1000"),
-        parseEther("1000"), // price is 1:1
-        0,
-        0,
+        {
+          tokenA: this.contracts.token0.address,
+          tokenB: this.contracts.token1.address,
+          amountADesired: parseEther("1000"),
+          amountBDesired: parseEther("1000"), // price is 1:1
+          amountAMin: 0,
+          amountBMin: 0,
+          fictiveReserveB: 0,
+          fictiveReserveAMin: 0,
+          fictiveReserveAMax: 0,
+        },
         this.signers.admin.address,
         constants.MaxUint256,
       );
@@ -142,7 +153,11 @@ export function shouldBehaveLikeSmardexPairPriceAverage(): void {
       expect(pAv.priceAverage1_).to.be.eq(priceAvgAfter10minAndSwap.priceAverageOut_);
     });
     it("Price after 1 swap half reserve", async function () {
-      await this.contracts.smardexPair.setFees(FEES_LP, FEES_POOL);
+      try {
+        await (this.contracts.smardexPair as SmardexPair).setFees(FEES_LP, FEES_POOL);
+      } catch {
+        // do nothing
+      }
       //add liquidity to pair
       await this.contracts.token0.approve(this.contracts.smardexRouterTest.address, parseEther("100000"));
       await this.contracts.token1.approve(this.contracts.smardexRouterTest.address, parseEther("100000"));
@@ -154,12 +169,17 @@ export function shouldBehaveLikeSmardexPairPriceAverage(): void {
         params: [block.timestamp + 12],
       });
       await this.contracts.smardexRouterTest.addLiquidity(
-        this.contracts.token0.address,
-        this.contracts.token1.address,
-        parseEther("1000"),
-        parseEther("1000"), // price is 1:1
-        0,
-        0,
+        {
+          tokenA: this.contracts.token0.address,
+          tokenB: this.contracts.token1.address,
+          amountADesired: parseEther("1000"),
+          amountBDesired: parseEther("1000"), // price is 1:1
+          amountAMin: 0,
+          amountBMin: 0,
+          fictiveReserveB: 0,
+          fictiveReserveAMin: 0,
+          fictiveReserveAMax: 0,
+        },
         this.signers.admin.address,
         constants.MaxUint256,
       );
@@ -204,12 +224,17 @@ export function shouldBehaveLikeSmardexPairPriceAverage(): void {
       // get block
       let block = await hre.ethers.provider.getBlock("latest");
       await this.contracts.smardexRouterTest.addLiquidity(
-        this.contracts.token0.address,
-        this.contracts.token1.address,
-        parseEther("1000"),
-        parseEther("1000"), // price is 1:1
-        0,
-        0,
+        {
+          tokenA: this.contracts.token0.address,
+          tokenB: this.contracts.token1.address,
+          amountADesired: parseEther("1000"),
+          amountBDesired: parseEther("1000"), // price is 1:1
+          amountAMin: 0,
+          amountBMin: 0,
+          fictiveReserveB: 0,
+          fictiveReserveAMin: 0,
+          fictiveReserveAMax: 0,
+        },
         this.signers.admin.address,
         constants.MaxUint256,
       );

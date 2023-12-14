@@ -30,7 +30,7 @@ contract FakeERC20reentrancy is ERC20 {
     }
 
     function transferFrom(address sender, address recipient, uint256 amount) public override returns (bool) {
-        if (active && recipient == PoolAddress.pairFor(factory, address(this), WETH)) {
+        if (active && recipient == ISmardexFactory(factory).getPair(address(this), WETH)) {
             active = false;
             //try to reentrancy add liquidity
             ISmardexPair(recipient).mint(address(this), 100, 100, address(this));
@@ -57,7 +57,10 @@ contract FakeERC20reentrancy is ERC20 {
 
     function smardexMintCallback(ISmardexMintCallback.MintCallbackData calldata _data) external {
         require(_data.amount0 > 0 || _data.amount1 > 0, "SmardexRouter: Callback Invalid amount");
-        require(msg.sender == PoolAddress.pairFor(factory, _data.token0, _data.token1), "SmarDexRouter: INVALID_PAIR"); // ensure that msg.sender is a pair
+        require(
+            msg.sender == ISmardexFactory(factory).getPair(_data.token0, _data.token1),
+            "SmarDexRouter: INVALID_PAIR"
+        ); // ensure that msg.sender is a pair
         // ISmardexPair(msg.sender).mint(address(this), 1, 1, _data.payer);
         pay(_data.token0, _data.payer, msg.sender, _data.amount0);
         pay(_data.token1, _data.payer, msg.sender, _data.amount1);

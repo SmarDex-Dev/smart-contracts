@@ -3,6 +3,7 @@ import { Contracts } from "../types";
 import { expect } from "chai";
 import { ADDRESS_DEAD, MINIMUM_LIQUIDITY } from "../constants";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
+import { parseEther } from "ethers/lib/utils";
 
 export async function sendTokensToPair(contracts: Contracts, token0Amount: BigNumber, token1Amount: BigNumber) {
   await contracts.token0.transfer(contracts.smardexPair.address, token0Amount);
@@ -16,12 +17,17 @@ export async function addLiquidity(
   token1Amount: BigNumber,
 ) {
   await contracts.smardexRouterTest.addLiquidity(
-    contracts.token0.address,
-    contracts.token1.address,
-    token0Amount,
-    token1Amount,
-    1,
-    1,
+    {
+      tokenA: contracts.token0.address,
+      tokenB: contracts.token1.address,
+      amountADesired: token0Amount,
+      amountBDesired: token1Amount,
+      amountAMin: 1,
+      amountBMin: 1,
+      fictiveReserveB: 0,
+      fictiveReserveAMin: 0,
+      fictiveReserveAMax: 0,
+    },
     admin.address,
     constants.MaxUint256,
   );
@@ -35,6 +41,7 @@ export async function mintAndCheck(
   expectedLiquidity: BigNumber,
 ) {
   const pricesAverage = await contracts.smardexPair.getPriceAverage();
+
   await expect(
     contracts.smardexRouterTest.mint(
       contracts.smardexPair.address,
@@ -167,3 +174,91 @@ export async function burnAndCheck(
   expect(await contracts.token0.balanceOf(admin.address)).to.eq(balanceUserToken0Before.add(expectedToken0));
   expect(await contracts.token1.balanceOf(admin.address)).to.eq(balanceUserToken1Before.add(expectedToken1));
 }
+
+export const mintTestCases: BigNumber[][] = [
+  [1, 4, 2],
+  ["1013000", "1013000", "1013000"],
+  [155, 1550, "490153037326098796459"],
+].map(a => a.map(n => (typeof n === "string" ? BigNumber.from(n) : parseEther(String(n)))));
+
+interface DoubleMint {
+  firstMintToken0: BigNumber;
+  firstMintToken1: BigNumber;
+  firstMintLP: BigNumber;
+  secondMintToken0: BigNumber;
+  secondMintToken1: BigNumber;
+  secondMintLP: BigNumber;
+}
+
+export const mintDoubleTestCases: DoubleMint[] = [
+  {
+    firstMintToken0: parseEther("155"),
+    firstMintToken1: parseEther("1550"),
+    firstMintLP: parseEther("490.153037326098796459"),
+    secondMintToken0: parseEther("15.5"),
+    secondMintToken1: parseEther("155"),
+    secondMintLP: parseEther("49.015303732609879645"),
+  },
+  {
+    firstMintToken0: parseEther("155"),
+    firstMintToken1: parseEther("1550"),
+    firstMintLP: parseEther("490.153037326098796459"),
+    secondMintToken0: parseEther("155"),
+    secondMintToken1: parseEther("155"),
+    secondMintLP: parseEther("49.015303732609879645"),
+  },
+  {
+    firstMintToken0: parseEther("155"),
+    firstMintToken1: parseEther("1550"),
+    firstMintLP: parseEther("490.153037326098796459"),
+    secondMintToken0: parseEther("15.5"),
+    secondMintToken1: parseEther("1550"),
+    secondMintLP: parseEther("49.015303732609879645"),
+  },
+  {
+    firstMintToken0: BigNumber.from("1013000"),
+    firstMintToken1: BigNumber.from("1013000"),
+    firstMintLP: BigNumber.from("1013000"),
+    secondMintToken0: BigNumber.from("1013000"),
+    secondMintToken1: BigNumber.from("1013000"),
+    secondMintLP: BigNumber.from("1013000"),
+  },
+];
+interface BurnTestData {
+  mintToken0: BigNumber;
+  mintToken1: BigNumber;
+  burnLP: BigNumber;
+  expectedToken0: BigNumber;
+  expectedToken1: BigNumber;
+}
+
+export const burnTestCases: BurnTestData[] = [
+  {
+    mintToken0: parseEther("3"),
+    mintToken1: parseEther("3"),
+    burnLP: parseEther("3").sub(MINIMUM_LIQUIDITY),
+    expectedToken0: parseEther("3").sub(MINIMUM_LIQUIDITY),
+    expectedToken1: parseEther("3").sub(MINIMUM_LIQUIDITY),
+  },
+  {
+    mintToken0: parseEther("101.3"),
+    mintToken1: parseEther("101.3"),
+    burnLP: parseEther("101.3").sub(MINIMUM_LIQUIDITY),
+    expectedToken0: parseEther("101.3").sub(MINIMUM_LIQUIDITY),
+    expectedToken1: parseEther("101.3").sub(MINIMUM_LIQUIDITY),
+  },
+  {
+    mintToken0: parseEther("101.3"),
+    mintToken1: parseEther("101.3"),
+    burnLP: parseEther("50.65").sub(MINIMUM_LIQUIDITY),
+    expectedToken0: parseEther("50.65").sub(MINIMUM_LIQUIDITY),
+    expectedToken1: parseEther("50.65").sub(MINIMUM_LIQUIDITY),
+  },
+  {
+    mintToken0: BigNumber.from("8000"),
+    mintToken1: BigNumber.from("8000"),
+    burnLP: constants.One,
+    expectedToken0: constants.One,
+    expectedToken1: constants.One,
+  },
+];

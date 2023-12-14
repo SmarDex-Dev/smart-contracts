@@ -2,6 +2,7 @@ import { BigNumber } from "ethers";
 import { parseEther } from "ethers/lib/utils";
 import { expect } from "chai";
 import { FEES_LP, FEES_POOL } from "../constants";
+
 export interface GetAmountTrade {
   reserveToken0: BigNumber;
   reserveToken1: BigNumber;

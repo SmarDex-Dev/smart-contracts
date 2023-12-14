@@ -1,11 +1,10 @@
 import { parseEther } from "ethers/lib/utils";
 import { DeployFunction } from "hardhat-deploy/types";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
-import { sendEtherTo, mainnets, smardexTokens } from "./utils";
+import { sendEtherTo, mainnets, smardexTokens, abiPaths } from "./utils";
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployments, getNamedAccounts, getChainId } = hre;
-  const { getContractFactory } = hre.ethers;
   const { deploy, save } = deployments;
 
   const { admin } = await getNamedAccounts();
@@ -24,11 +23,11 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       log: true,
     });
   } else {
-    const smardexToken = await getContractFactory(chainId === "1" ? "SmardexToken" : "SmardexTokenL2");
+    const smardexTokenArtifact: string = chainId === "1" ? "SmardexToken" : "SmardexTokenL2";
 
     await save("SmardexToken", {
       address: smardexTokens[chainId],
-      abi: JSON.parse(smardexToken.interface.format("json") as string),
+      abi: (await import(abiPaths[smardexTokenArtifact as keyof typeof abiPaths])).abi,
     });
   }
 };

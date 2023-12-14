@@ -54,6 +54,12 @@ export function shouldBehaveLikeRewardManager() {
 
         // add the first reward info
         expect(await smardexToken.allowance(rewardManagerTest.address, farmingContract.address)).to.eq(0);
+
+        const currentBlock = await latestBlockNumber();
+
+        // create empty reward info ended in future
+        await farmingContract.addRewardInfo(constants.Zero, currentBlock.add(3), constants.Zero);
+
         await farmingContract.addRewardInfo(0, startBlock.add(11), INITIAL_BONUS_REWARD_PER_BLOCK);
         //If allowance is more than 0 then resetAllowance worked
         expect(await smardexToken.allowance(rewardManagerTest.address, farmingContract.address)).to.eq(

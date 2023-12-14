@@ -23,66 +23,29 @@ library PoolHelpers {
     }
 
     /**
-     * @notice fetches the reserves for a pair
-     * @param _factory the factory address
-     * @param _tokenA token to fetch reserves
-     * @param _tokenB token to fetch reserves
-     * @return reserveA_ reserves of tokenA in the pair tokenA/TokenB
-     * @return reserveB_ reserves of tokenB in the pair tokenA/TokenB
-     */
-    function getReserves(
-        address _factory,
-        address _tokenA,
-        address _tokenB
-    ) internal view returns (uint256 reserveA_, uint256 reserveB_) {
-        (address _token0, ) = sortTokens(_tokenA, _tokenB);
-        (uint256 _reserve0, uint256 _reserve1) = ISmardexPair(PoolAddress.pairFor(_factory, _tokenA, _tokenB))
-            .getReserves();
-        (reserveA_, reserveB_) = _tokenA == _token0 ? (_reserve0, _reserve1) : (_reserve1, _reserve0);
-    }
-
-    /**
-     * @notice fetches the fictive reserves for a pair
+     * @notice fetches the real and fictive reserves for a pair
      * @param _factory the factory address
      * @param _tokenA token to fetch fictive reserves
      * @param _tokenB token to fetch fictive reserves
+     * @param _whitelist storage mapping with the pair address as value
+     * @return reserveA_ reserves of tokenA in the pair tokenA/TokenB
+     * @return reserveB_ reserves of tokenB in the pair tokenA/TokenB
      * @return fictiveReserveA_ fictive reserves of tokenA in the pair tokenA/TokenB
      * @return fictiveReserveB_ fictive reserves of tokenB in the pair tokenA/TokenB
      */
-    function getFictiveReserves(
+    function getAllReserves(
         address _factory,
         address _tokenA,
-        address _tokenB
-    ) internal view returns (uint256 fictiveReserveA_, uint256 fictiveReserveB_) {
+        address _tokenB,
+        mapping(bytes32 => address) storage _whitelist
+    ) internal view returns (uint256 reserveA_, uint256 reserveB_, uint256 fictiveReserveA_, uint256 fictiveReserveB_) {
         (address _token0, ) = sortTokens(_tokenA, _tokenB);
-        (uint256 _fictiveReserve0, uint256 _fictiveReserve1) = ISmardexPair(
-            PoolAddress.pairFor(_factory, _tokenA, _tokenB)
-        ).getFictiveReserves();
-        (fictiveReserveA_, fictiveReserveB_) = _tokenA == _token0
-            ? (_fictiveReserve0, _fictiveReserve1)
-            : (_fictiveReserve1, _fictiveReserve0);
-    }
-
-    /**
-     * @notice fetches the priceAverage for a pair
-     * @param _factory the factory address
-     * @param _tokenA token to fetch priceAverage
-     * @param _tokenB token to fetch priceAverage
-     * @return priceAverageA_ priceAverage of tokenA in the pair tokenA/TokenB
-     * @return priceAverageB_ priceAverage of tokenB in the pair tokenA/TokenB
-     */
-    function getPriceAverage(
-        address _factory,
-        address _tokenA,
-        address _tokenB
-    ) internal view returns (uint256 priceAverageA_, uint256 priceAverageB_) {
-        (address _token0, ) = sortTokens(_tokenA, _tokenB);
-        (uint256 _priceAverage0, uint256 _priceAverage1, ) = ISmardexPair(
-            PoolAddress.pairFor(_factory, _tokenA, _tokenB)
-        ).getPriceAverage();
-        (priceAverageA_, priceAverageB_) = _tokenA == _token0
-            ? (_priceAverage0, _priceAverage1)
-            : (_priceAverage1, _priceAverage0);
+        ISmardexPair _pair = ISmardexPair(PoolAddress.pairFor(_factory, _tokenA, _tokenB, _whitelist));
+        (uint256 _reserve0, uint256 _reserve1) = _pair.getReserves();
+        (uint256 _fictiveReserve0, uint256 _fictiveReserve1) = _pair.getFictiveReserves();
+        (reserveA_, reserveB_, fictiveReserveA_, fictiveReserveB_) = _tokenA == _token0
+            ? (_reserve0, _reserve1, _fictiveReserve0, _fictiveReserve1)
+            : (_reserve1, _reserve0, _fictiveReserve1, _fictiveReserve0);
     }
 
     /**

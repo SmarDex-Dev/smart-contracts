@@ -1,293 +1,203 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types";
-import { parseEther } from "ethers/lib/utils";
-import { ERC20Test, SmardexRouter, WETH9 } from "../typechain";
-import { BigNumber, constants, ContractTransaction } from "ethers";
-import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signer-with-address";
-import { FunctionFragment } from "@ethersproject/abi";
+import { reset, setBalance } from "@nomicfoundation/hardhat-network-helpers";
+import { ERC20Test, SmardexRouter } from "../typechain";
+import { writeFile } from "node:fs/promises";
 
-interface GasData {
-  hop: number;
-  gasMin: BigNumber;
-  gasMax: BigNumber;
-  gasAvg: BigNumber;
+const MAX_HOPS = 6;
+
+const networks = {
+  ethereum: process.env.URL_ETH_MAINNET || "https://ethereum.publicnode.com/",
+  polygon: process.env.URL_POLYGON || "https://polygon-rpc.com/",
+  bsc: process.env.URL_BSC || "https://bsc-dataseed.binance.org/",
+  arbitrum: process.env.URL_ARBITRUM || "https://arb1.arbitrum.io/rpc",
+  base: process.env.URL_BASE || "https://mainnet.base.org",
+};
+
+type GasData = {
+  swapETHForExactTokens: number;
+  swapExactETHForTokens: number;
+  swapExactTokensForETH: number;
+  swapExactTokensForTokens: number;
+  swapTokensForExactETH: number;
+  swapTokensForExactTokens: number;
+};
+
+type NetworkGasData = {
+  hop: GasData;
+  nextHop: GasData;
+};
+
+type Output = {
+  [key in keyof typeof networks]?: NetworkGasData;
+};
+
+export async function generateSwapGasCost(_args: undefined, hre: HardhatRuntimeEnvironment) {
+  const { ethers } = hre;
+  const signers = await ethers.getSigners();
+  const out: Output = {};
+  for (const [network, url] of Object.entries(networks)) {
+    await reset(url);
+    console.log("forked", network, "at height", await ethers.provider.getBlockNumber());
+    await setBalance(signers[0].address, "0x52B7D2DCC80CD2E4000000");
+    const routerAddress = await getDeployedAddress(network, "SmardexRouter");
+    const router = await ethers.getContractAt("SmardexRouter", routerAddress);
+
+    const tokens = await deployTokens(router, hre);
+
+    const hopsData = await Promise.all([...Array(MAX_HOPS).keys()].map(i => getGasData(router, i + 1, tokens, hre)));
+    const avgHop: GasData = {
+      swapETHForExactTokens: 0,
+      swapExactETHForTokens: 0,
+      swapExactTokensForETH: 0,
+      swapExactTokensForTokens: 0,
+      swapTokensForExactETH: 0,
+      swapTokensForExactTokens: 0,
+    };
+    for (let i = 1; i <= hopsData.length - 1; i++) {
+      for (const key of Object.keys(hopsData[i]) as (keyof GasData)[]) {
+        avgHop[key] = avgHop[key] + (hopsData[i][key] - hopsData[i - 1][key]);
+      }
+    }
+    for (const key of Object.keys(avgHop) as (keyof GasData)[]) {
+      avgHop[key] = Math.round(avgHop[key] / (hopsData.length - 1));
+    }
+    out[network as keyof typeof networks] = {
+      hop: hopsData[0],
+      nextHop: avgHop,
+    };
+  }
+  await writeFile("cache/gas_usage.json", JSON.stringify(out));
+  console.log("Data written to file at cache/gas_usage.json");
 }
 
-interface GasFunction {
-  swapExactTokensForTokens: GasData[];
-  swapTokensForExactTokens: GasData[];
-  swapTokensForExactETH: GasData[];
-  swapETHForExactTokens: GasData[];
-  swapExactETHForTokens: GasData[];
-  swapExactTokensForETH: GasData[];
-}
-
-const NB_TX = 20;
-
-export async function generateSwapGasCost(args: undefined, hre: HardhatRuntimeEnvironment) {
-  const { getContractAt } = hre.ethers;
-  const signers = await hre.ethers.getSigners();
-  const erc20TestFactory = await hre.ethers.getContractFactory("ERC20Test");
-
-  const routerAddress = await getDeployedAddress(hre, "SmardexRouter");
-  const factoryAddress = await getDeployedAddress(hre, "SmardexFactory");
-  const wethAddress = await getDeployedAddress(hre, "WETH9");
-  const router = await getContractAt("SmardexRouter", routerAddress);
-  const factory = await getContractAt("SmardexFactory", factoryAddress);
-  const weth = await getContractAt("WETH9", wethAddress);
-
-  await hre.network.provider.request({
-    method: "hardhat_reset",
-    params: [
-      {
-        forking: {
-          jsonRpcUrl: process.env.URL_ETH_MAINNET,
-        },
-      },
-    ],
-  });
-
-  await hre.network.provider.send("hardhat_setBalance", [signers[0].address, "0x52B7D2DCC80CD2E4000000"]);
-
-  const tokens: ERC20Test[] = [];
-
-  for (let i = 0; i < 6; i++) {
-    console.log("Generating data with " + i + " hops");
-    tokens.push(await erc20TestFactory.deploy(constants.MaxUint256));
-    const erc20 = await getContractAt("ERC20Test", tokens[i].address);
-    await erc20.connect(signers[0]).approve(routerAddress, constants.MaxUint256);
-
-    await factory.createPair(tokens[i].address, wethAddress);
-    await router.addLiquidityETH(
-      tokens[i].address,
-      parseEther("100000"),
-      parseEther("100000"),
-      parseEther("100000"),
-      signers[0].address,
-      constants.MaxUint256,
-      { value: parseEther("100000") },
-    );
-  }
-  for (let i = 0; i < 6; i++) {
-    const nextAddress = i === 5 ? tokens[0].address : tokens[i + 1].address;
-
-    await factory.createPair(tokens[i].address, nextAddress);
-    const pairAddress = await factory.getPair(tokens[i].address, nextAddress);
-    const pair = await getContractAt("SmardexPairTest", pairAddress);
-
-    const token0 = await pair.token0();
-    const token1 = await pair.token1();
-
-    await router.addLiquidity(
-      token0,
-      token1,
-      parseEther("100000"),
-      parseEther("100000"),
-      parseEther("100000"),
-      parseEther("100000"),
-      signers[0].address,
-      constants.MaxUint256,
-    );
-  }
-  const gasData: GasFunction = {
-    swapExactTokensForTokens: [],
-    swapTokensForExactTokens: [],
-    swapTokensForExactETH: [],
-    swapETHForExactTokens: [],
-    swapExactETHForTokens: [],
-    swapExactTokensForETH: [],
-  };
-
-  for (let i = 0; i < 5; i++) {
-    gasData.swapExactTokensForTokens.push(
-      await generateGasData(
-        i + 1,
-        router,
-        signers[0],
-        router.interface.functions["swapExactTokensForTokens(uint256,uint256,address[],address,uint256)"],
-        tokens,
-        weth,
-      ),
-    );
-
-    gasData.swapTokensForExactTokens.push(
-      await generateGasData(
-        i + 1,
-        router,
-        signers[0],
-        router.interface.functions["swapTokensForExactTokens(uint256,uint256,address[],address,uint256)"],
-        tokens,
-        weth,
-      ),
-    );
-
-    gasData.swapTokensForExactETH.push(
-      await generateGasData(
-        i + 1,
-        router,
-        signers[0],
-        router.interface.functions["swapTokensForExactETH(uint256,uint256,address[],address,uint256)"],
-        tokens,
-        weth,
-      ),
-    );
-
-    gasData.swapETHForExactTokens.push(
-      await generateGasData(
-        i + 1,
-        router,
-        signers[0],
-        router.interface.functions["swapETHForExactTokens(uint256,address[],address,uint256)"],
-        tokens,
-        weth,
-      ),
-    );
-
-    gasData.swapExactETHForTokens.push(
-      await generateGasData(
-        i + 1,
-        router,
-        signers[0],
-        router.interface.functions["swapExactETHForTokens(uint256,address[],address,uint256)"],
-        tokens,
-        weth,
-      ),
-    );
-    gasData.swapExactTokensForETH.push(
-      await generateGasData(
-        i + 1,
-        router,
-        signers[0],
-        router.interface.functions["swapExactTokensForETH(uint256,uint256,address[],address,uint256)"],
-        tokens,
-        weth,
-      ),
-    );
-  }
-
-  console.log(gasData);
-}
-
-async function generateGasData(
-  hop: number,
+async function getGasData(
   router: SmardexRouter,
-  signer: SignerWithAddress,
-  functionFragment: FunctionFragment,
+  hops: number,
   tokens: ERC20Test[],
-  weth: WETH9,
+  hre: HardhatRuntimeEnvironment,
 ): Promise<GasData> {
-  let gasData: GasData = {
-    hop: hop,
-    gasAvg: constants.Zero,
-    gasMin: constants.Zero,
-    gasMax: constants.Zero,
+  const wethAddress = await router.WETH();
+  const tokensSlice = tokens.slice(0, hops).map(t => t.address);
+  const allTokens = tokens.slice(0, hops + 1).map(t => t.address);
+  return {
+    swapETHForExactTokens: (await getGasUsedAverage(router, [wethAddress, ...tokensSlice], false, hre)).toNumber(),
+    swapExactETHForTokens: (await getGasUsedAverage(router, [wethAddress, ...tokensSlice], true, hre)).toNumber(),
+    swapExactTokensForETH: (await getGasUsedAverage(router, [...tokensSlice, wethAddress], true, hre)).toNumber(),
+    swapExactTokensForTokens: (await getGasUsedAverage(router, allTokens, true, hre)).toNumber(),
+    swapTokensForExactETH: (await getGasUsedAverage(router, [...tokensSlice, wethAddress], false, hre)).toNumber(),
+    swapTokensForExactTokens: (await getGasUsedAverage(router, allTokens, false, hre)).toNumber(),
   };
-  let tmpAvg = constants.Zero;
-  for (let i = 0; i < NB_TX; i++) {
-    const gasUsed = await generateTx(hop, functionFragment, router, signer, tokens, weth);
-    tmpAvg = tmpAvg.add(gasUsed);
-    gasData = checkGas(gasData, gasUsed);
-  }
-  gasData.gasAvg = tmpAvg.div(NB_TX);
-  return gasData;
 }
 
-async function generateTx(
-  hop: number,
-  functionFragment: FunctionFragment,
+async function getGasUsedAverage(
   router: SmardexRouter,
-  signer: SignerWithAddress,
-  tokens: ERC20Test[],
-  weth: WETH9,
-): Promise<BigNumber> {
-  let path: string[] = [];
-  let tx: ContractTransaction;
-  const amount = randomAmount();
-  if (
-    functionFragment ===
-    router.interface.functions["swapExactTokensForTokens(uint256,uint256,address[],address,uint256)"]
-  ) {
-    path = generatePath(hop, tokens, weth.address, false, false);
-    tx = await router.swapExactTokensForTokens(amount, 0, path, signer.address, constants.MaxUint256);
-  } else if (
-    functionFragment ===
-    router.interface.functions["swapTokensForExactTokens(uint256,uint256,address[],address,uint256)"]
-  ) {
-    path = generatePath(hop, tokens, weth.address, false, false);
-    tx = await router.swapTokensForExactTokens(
-      amount,
-      constants.MaxUint256,
-      path,
-      signer.address,
-      constants.MaxUint256,
-    );
-  } else if (
-    functionFragment === router.interface.functions["swapTokensForExactETH(uint256,uint256,address[],address,uint256)"]
-  ) {
-    path = generatePath(hop, tokens, weth.address, true, true);
-    tx = await router.swapTokensForExactETH(amount, constants.MaxUint256, path, signer.address, constants.MaxUint256);
-  } else if (
-    functionFragment === router.interface.functions["swapETHForExactTokens(uint256,address[],address,uint256)"]
-  ) {
-    path = generatePath(hop, tokens, weth.address, true, false);
-    tx = await router.swapETHForExactTokens(amount, path, signer.address, constants.MaxUint256, {
-      value: parseEther("1000"),
-    });
-  } else if (
-    functionFragment === router.interface.functions["swapExactETHForTokens(uint256,address[],address,uint256)"]
-  ) {
-    path = generatePath(hop, tokens, weth.address, true, false);
-    tx = await router.swapExactETHForTokens(0, path, signer.address, constants.MaxUint256, { value: amount });
-  } else if (
-    functionFragment === router.interface.functions["swapExactTokensForETH(uint256,uint256,address[],address,uint256)"]
-  ) {
-    path = generatePath(hop, tokens, weth.address, true, true);
-    tx = await router.swapExactTokensForETH(amount, 0, path, signer.address, constants.MaxUint256);
-  }
-  const receipt = await tx!.wait();
-  return receipt.gasUsed;
+  path: string[],
+  exactInput: boolean,
+  hre: HardhatRuntimeEnvironment,
+) {
+  // first run is discarded because storage needs to get initialized
+  await getGasUsed(router, path, exactInput, hre); // ignored
+  return getGasUsed(router, path, exactInput, hre);
 }
 
-function generatePath(hop: number, tokens: ERC20Test[], weth: string, wethInPath: boolean, toWeth: boolean): string[] {
-  const path: string[] = [];
-  let currentIndex: number | undefined = undefined;
-  const reverse: boolean = Math.random() < 0.5;
-  for (let i = 0; i < hop + 1; i++) {
-    if ((wethInPath && !toWeth && i === 0) || (wethInPath && toWeth && i === hop)) {
-      path.push(weth);
-    } else if (currentIndex === undefined) {
-      currentIndex = Math.floor(Math.random() * tokens.length);
-      path.push(tokens[currentIndex].address);
-    } else if (reverse) {
-      currentIndex = currentIndex === 0 ? tokens.length - 1 : currentIndex - 1;
-      path.push(tokens[currentIndex].address);
+async function getGasUsed(router: SmardexRouter, path: string[], exactInput: boolean, hre: HardhatRuntimeEnvironment) {
+  const { ethers } = hre;
+  const { MaxUint256 } = ethers.constants;
+  const signers = await ethers.getSigners();
+  const wethAddress = await router.WETH();
+  let tx;
+  if (exactInput) {
+    if (path[0] === wethAddress) {
+      tx = await router.swapExactETHForTokens(0, path, signers[0].address, MaxUint256, { value: randomAmount(hre) });
+    } else if (path[path.length - 1] === wethAddress) {
+      tx = await router.swapExactTokensForETH(randomAmount(hre), 0, path, signers[0].address, MaxUint256);
     } else {
-      currentIndex = currentIndex === tokens.length - 1 ? 0 : currentIndex + 1;
-      path.push(tokens[currentIndex].address);
+      tx = await router.swapExactTokensForTokens(randomAmount(hre), 0, path, signers[0].address, MaxUint256);
+    }
+  } else {
+    if (path[0] === wethAddress) {
+      const amount = randomAmount(hre);
+      tx = await router.swapETHForExactTokens(amount, path, signers[0].address, MaxUint256, {
+        value: amount.mul(2),
+      });
+    } else if (path[path.length - 1] === wethAddress) {
+      tx = await router.swapTokensForExactETH(randomAmount(hre), MaxUint256, path, signers[0].address, MaxUint256);
+    } else {
+      tx = await router.swapTokensForExactTokens(randomAmount(hre), MaxUint256, path, signers[0].address, MaxUint256);
     }
   }
-  return path;
+  return (await tx.wait()).gasUsed;
 }
 
-function randomAmount(): BigNumber {
-  return parseEther((Math.floor(Math.random() * 10) + 1).toString());
+async function deployTokens(router: SmardexRouter, hre: HardhatRuntimeEnvironment) {
+  const { ethers } = hre;
+  const { MaxUint256 } = ethers.constants;
+  const { parseEther } = ethers.utils;
+  const signers = await ethers.getSigners();
+  const tokenFactory = await hre.ethers.getContractFactory("ERC20Test");
+  const tokens = await Promise.all(
+    [...Array(MAX_HOPS + 1).keys()].map(() => {
+      return tokenFactory.deploy(MaxUint256);
+    }),
+  );
+  await Promise.all(tokens.map(token => token.deployed()));
+  await Promise.all(tokens.map(token => token.approve(router.address, MaxUint256)));
+  await Promise.all(
+    tokens.map(token =>
+      router.addLiquidityETH(
+        {
+          token: token.address,
+          amountTokenDesired: parseEther("100000"),
+          amountTokenMin: 0,
+          amountETHMin: 0,
+          fictiveReserveETH: 0,
+          fictiveReserveTokenMin: 0,
+          fictiveReserveTokenMax: 0,
+        },
+        signers[0].address,
+        MaxUint256,
+        {
+          value: parseEther("100000"),
+        },
+      ),
+    ),
+  );
+  await Promise.all(
+    Array.from(slidingWindow(tokens, 2)).map(([tokenA, tokenB]) => {
+      return router.addLiquidity(
+        {
+          tokenA: tokenA.address,
+          tokenB: tokenB.address,
+          amountADesired: parseEther("100000"),
+          amountBDesired: parseEther("100000"),
+          amountAMin: 0,
+          amountBMin: 0,
+          fictiveReserveB: 0,
+          fictiveReserveAMin: 0,
+          fictiveReserveAMax: 0,
+        },
+        signers[0].address,
+        MaxUint256,
+      );
+    }),
+  );
+  return tokens;
 }
 
-function checkGas(gasData: GasData, gasUsed: BigNumber): GasData {
-  if (gasData.gasMin.eq(0) || gasData.gasMin.gt(gasUsed)) {
-    gasData.gasMin = gasUsed;
-  }
-  if (gasData.gasMax.eq(0) || gasData.gasMax.lt(gasUsed)) {
-    gasData.gasMax = gasUsed;
-  }
-  return gasData;
-}
-
-async function getDeployedAddress(hre: HardhatRuntimeEnvironment, contractName: string): Promise<string> {
+async function getDeployedAddress(network: string, contractName: string): Promise<string> {
   try {
-    return (await import(`../deployments/ethereum/${contractName}.json`)).address;
+    return (await import(`../deployments/${network}/${contractName}.json`)).address;
   } catch (e) {
-    throw new Error(
-      `Error while fetching addresses, maybe you didn't deployed the ${contractName} on the network ethereum ?`,
-    );
+    throw new Error(`Error while fetching addresses, maybe you didn't deployed the ${contractName} on ${network} ?`);
+  }
+}
+
+function randomAmount(hre: HardhatRuntimeEnvironment) {
+  return hre.ethers.utils.parseEther((Math.floor(Math.random() * 10) + 1).toString());
+}
+
+function* slidingWindow(inputArray: any[], size: number) {
+  for (let index = 0; index + size <= inputArray.length; index++) {
+    yield inputArray.slice(index, index + size);
   }
 }

@@ -1,38 +1,54 @@
 import { readFile, writeFile } from "fs/promises";
 
 export async function switchPairHashFunctionCoverage() {
-  const poolAddressPath = __dirname + "/../contracts/periphery/libraries/PoolAddress.sol";
-  const routerTestPath = __dirname + "/../contracts/periphery/test/SmardexRouterTest.sol";
-  const routerForPairTestPath = __dirname + "/../contracts/periphery/test/RouterForPairTest.sol";
+  // Construct the path of the files
+  const poolAddress1Path = __dirname + "/../contracts/periphery/libraries/PoolAddress.sol";
+  const poolAddress2Path = __dirname + "/../contracts/periphery/test/peripheryV2WithV1/libraries/PoolAddressV1.sol";
+
   try {
-    const poolAddressData = await readFile(poolAddressPath, "utf8");
-    const routerTestData = await readFile(routerTestPath, "utf8");
-    const routerForPairData = await readFile(routerForPairTestPath, "utf8");
+    // Load the files contents
+    let poolAddress1Result = await readFile(poolAddress1Path, "utf8");
+    let poolAddress2Result = await readFile(poolAddress2Path, "utf8");
 
-    let poolAddressResult;
-    let routerTestResult;
-    let routerForPairResult;
+    if (!poolAddress1Result.includes(".creationCode")) {
+      // Update poolAddress1
+      poolAddress1Result = poolAddress1Result.replace(
+        'import "./PoolHelpers.sol";',
+        'import "./PoolHelpers.sol";\nimport "../../core/SmardexPair.sol";',
+      );
+      poolAddress1Result = poolAddress1Result.replace(
+        'hex"c762a0f9885cc92b9fd8eef224b75997682b634460611bc0f2138986e20b653f"',
+        "keccak256(type(SmardexPair).creationCode)",
+      );
 
-    if (routerTestData.includes("public pure returns")) {
-      poolAddressResult = poolAddressData.replace("function pairFor(", "function pairForByHash(");
-      poolAddressResult = poolAddressResult.replace("function pairForByStorage(", "function pairFor(");
-
-      routerForPairResult = routerForPairData.replace("PoolAddress.pairForByStorage(", "PoolAddress.pairFor(");
-      routerForPairResult = routerForPairResult.replace("PoolAddress.pairForByStorage(", "PoolAddress.pairFor(");
-
-      routerTestResult = routerTestData.replace("public pure returns", "public view returns");
+      // Update poolAddress2
+      poolAddress2Result = poolAddress2Result.replace(
+        'import "./PoolHelpersV1.sol";',
+        'import "./PoolHelpersV1.sol";\nimport "../../../../core/test/coreV1/SmardexPairV1.sol";',
+      );
+      poolAddress2Result = poolAddress2Result.replace(
+        'hex"6d32bf72ec5cc02d3e64eaf60f63b064ca3cd98c7661d933bab660a552327576"',
+        "keccak256(type(SmardexPairV1).creationCode)",
+      );
     } else {
-      poolAddressResult = poolAddressData.replace("function pairFor(", "function pairForByStorage(");
-      poolAddressResult = poolAddressResult.replace("function pairForByHash(", "function pairFor(");
+      // Update poolAddress1
+      poolAddress1Result = poolAddress1Result.replace('\nimport "../../core/SmardexPair.sol";', "");
+      poolAddress1Result = poolAddress1Result.replace(
+        "keccak256(type(SmardexPair).creationCode)",
+        'hex"c762a0f9885cc92b9fd8eef224b75997682b634460611bc0f2138986e20b653f"',
+      );
 
-      routerForPairResult = routerForPairData.replace("PoolAddress.pairFor(", "PoolAddress.pairForByStorage(");
-      routerForPairResult = routerForPairResult.replace("PoolAddress.pairFor(", "PoolAddress.pairForByStorage(");
-
-      routerTestResult = routerTestData.replace("public view returns", "public pure returns");
+      // Update poolAddress2
+      poolAddress2Result = poolAddress2Result.replace('\nimport "../../../../core/test/coreV1/SmardexPairV1.sol";', "");
+      poolAddress2Result = poolAddress2Result.replace(
+        "keccak256(type(SmardexPairV1).creationCode)",
+        'hex"6d32bf72ec5cc02d3e64eaf60f63b064ca3cd98c7661d933bab660a552327576"',
+      );
     }
-    await writeFile(poolAddressPath, poolAddressResult, "utf8");
-    await writeFile(routerTestPath, routerTestResult, "utf8");
-    await writeFile(routerForPairTestPath, routerForPairResult, "utf8");
+
+    // Write the files
+    await writeFile(poolAddress1Path, poolAddress1Result, "utf8");
+    await writeFile(poolAddress2Path, poolAddress2Result, "utf8");
   } catch (error) {
     console.error(error);
   }

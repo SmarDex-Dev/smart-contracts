@@ -53,6 +53,21 @@ interface IAutoSwapper is ISmardexSwapCallback {
     function executeWork(IERC20 _token0, IERC20 _token1) external;
 
     /**
+     * @notice onlyOwner function to swap token in SDEX and send it to the staking address (or burn on L2)
+     * @param _amountToSwap amount of tokens from _path[0] to be converted into SDEX
+     * @param _amountOutMin The minimum SDEX amount required to prevent the transaction from reverting
+     * @param _path An array of token addresses. path.length must be >= 2. Pools for each consecutive pair of addresses
+     * must exist and have liquidity. Last token must be SDEX
+     * @param _deadline Unix timestamp after which the transaction will revert
+     */
+    function swapTokenWithPath(
+        uint256 _amountToSwap,
+        uint256 _amountOutMin,
+        address[] calldata _path,
+        uint256 _deadline
+    ) external;
+
+    /**
      * @notice transfer SDEX from here to address dead
      * @return _amount the transferred SDEX amount
      */

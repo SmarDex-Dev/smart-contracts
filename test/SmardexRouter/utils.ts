@@ -35,12 +35,17 @@ export async function WETHPairInitialize(this: Context, WETHPartnerAmount: BigNu
   await this.contracts.WETH.deposit({ value: ETHAmount });
   await this.contracts.WETH.approve(this.contracts.smardexRouter.address, ETHAmount);
   await this.contracts.smardexRouter.addLiquidity(
-    this.contracts.WETHPartner.address,
-    this.contracts.WETH.address,
-    WETHPartnerAmount,
-    ETHAmount,
-    1,
-    1,
+    {
+      tokenA: this.contracts.WETHPartner.address,
+      tokenB: this.contracts.WETH.address,
+      amountADesired: WETHPartnerAmount,
+      amountBDesired: ETHAmount,
+      amountAMin: 1,
+      amountBMin: 1,
+      fictiveReserveB: 0,
+      fictiveReserveAMin: 0,
+      fictiveReserveAMax: 0,
+    },
     this.signers.admin.address,
     constants.MaxUint256,
   );
@@ -55,12 +60,17 @@ export async function addLiquidity(
   recipientAddress: string,
 ) {
   await router.addLiquidity(
-    token0.address,
-    token1.address,
-    token0Amount,
-    token1Amount,
-    1,
-    1,
+    {
+      tokenA: token0.address,
+      tokenB: token1.address,
+      amountADesired: token0Amount,
+      amountBDesired: token1Amount,
+      amountAMin: 1,
+      amountBMin: 1,
+      fictiveReserveB: 0,
+      fictiveReserveAMin: 0,
+      fictiveReserveAMax: 0,
+    },
     recipientAddress,
     constants.MaxUint256,
   );

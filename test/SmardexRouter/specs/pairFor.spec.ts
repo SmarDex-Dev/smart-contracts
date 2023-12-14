@@ -16,7 +16,6 @@ export function shouldBehaveLikeSmardexRouterPairFor(): void {
     );
 
     const init_hash = ' hex"' + keccak256(SmardexPair__factory.bytecode).slice(2) + '"';
-
     expect(pair).to.be.eq(pair_factory);
     expect(pair).to.be.eq(
       pair_pure,

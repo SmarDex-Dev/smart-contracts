@@ -1,4 +1,4 @@
-import { INITIAL_BONUS_REWARD_PER_BLOCK } from "../utils";
+import { INITIAL_BONUS_REWARD_PER_BLOCK, addCampaignAndCreateRewards } from "../utils";
 import { parseEther, parseUnits } from "ethers/lib/utils";
 import { BigNumber, constants } from "ethers";
 import { expect } from "chai";
@@ -33,12 +33,17 @@ export function shouldBehaveLikeWithdraw() {
         // alice approve farming range
         await this.farming.stakingTokenAsAlice.approve(this.farming.farmingRange.address, parseEther("100"));
         // alice deposit @block number #(mockedBlock+6)
-        await this.farming.farmingRangeAsAlice.deposit(constants.Zero, parseEther("100"));
+        await this.farming.farmingRangeAsAlice.deposit(constants.Zero, parseEther("100"), this.signers.user.address);
 
         // mint reward token to Deployer (when add rewardInfo)
-        await expect(this.farming.farmingRangeAsAlice.withdraw(constants.Zero, parseEther("2000"))).to.be.revertedWith(
-          "FarmingRange::withdraw::bad withdraw amount",
-        );
+        await expect(
+          this.farming.farmingRangeAsAlice.withdraw(
+            constants.Zero,
+            parseEther("2000"),
+            this.signers.user.address,
+            this.signers.user.address,
+          ),
+        ).to.be.revertedWith("FarmingRange::withdraw::bad withdraw amount");
       });
       it("when no rewards", async function () {
         // mint reward token to Deployer (when add rewardInfo)
@@ -62,9 +67,16 @@ export function shouldBehaveLikeWithdraw() {
         // alice approve farming range
         await this.farming.stakingTokenAsAlice.approve(this.farming.farmingRange.address, parseEther("100"));
         // alice deposit @block number #(mockedBlock+6)
-        await this.farming.farmingRangeAsAlice.deposit(constants.Zero, parseEther("100"));
+        await this.farming.farmingRangeAsAlice.deposit(constants.Zero, parseEther("100"), this.signers.user.address);
         // alice withdraw @block number #(mockedBlock+7)
-        await expect(this.farming.farmingRangeAsAlice.withdraw(constants.Zero, parseEther("100"))).to.not.be.reverted;
+        await expect(
+          this.farming.farmingRangeAsAlice.withdraw(
+            constants.Zero,
+            parseEther("100"),
+            this.signers.user.address,
+            this.signers.user.address,
+          ),
+        ).to.not.be.reverted;
 
         expect(await this.farming.rewardToken.balanceOf(this.signers.user.address)).to.eq(0);
         expect((await this.farming.farmingRangeAsAlice.campaignInfo(constants.Zero)).totalStaked).to.eq(constants.Zero);
@@ -80,7 +92,9 @@ export function shouldBehaveLikeWithdraw() {
           await this.farming.stakingTokenAsAlice.approve(this.farming.farmingRange.address, parseEther("100"));
 
           // alice deposit @block number #(mockedBlock+10)
-          await expect(this.farming.farmingRangeAsAlice.deposit(constants.Zero, parseEther("100"))).to.be.reverted;
+          await expect(
+            this.farming.farmingRangeAsAlice.deposit(constants.Zero, parseEther("100"), this.signers.user.address),
+          ).to.be.reverted;
         });
       });
       context("when the user doesn't approve farming range contract", async function () {
@@ -105,7 +119,9 @@ export function shouldBehaveLikeWithdraw() {
           await this.farming.stakingTokenAsDeployer.mint(this.signers.user.address, parseEther("100"));
 
           // alice deposit @block number #(mockedBlock+10)
-          await expect(this.farming.farmingRangeAsAlice.deposit(constants.Zero, parseEther("100"))).to.be.reverted;
+          await expect(
+            this.farming.farmingRangeAsAlice.deposit(constants.Zero, parseEther("100"), this.signers.user.address),
+          ).to.be.reverted;
         });
       });
     });
@@ -143,9 +159,18 @@ export function shouldBehaveLikeWithdraw() {
                   // alice approve farming range
                   await this.farming.stakingTokenAsAlice.approve(this.farming.farmingRange.address, parseEther("100"));
                   // alice deposit @block number #(mockedBlock+6)
-                  await this.farming.farmingRangeAsAlice.deposit(constants.Zero, parseEther("100"));
+                  await this.farming.farmingRangeAsAlice.deposit(
+                    constants.Zero,
+                    parseEther("100"),
+                    this.signers.user.address,
+                  );
                   // alice withdraw @block number #(mockedBlock+7)
-                  await this.farming.farmingRangeAsAlice.withdraw(constants.Zero, parseEther("100"));
+                  await this.farming.farmingRangeAsAlice.withdraw(
+                    constants.Zero,
+                    parseEther("100"),
+                    this.signers.user.address,
+                    this.signers.user.address,
+                  );
 
                   expect(await this.farming.rewardToken.balanceOf(this.signers.user.address)).to.eq(
                     parseEther("100"), // Alice deposited @ block #(mockedBlock+5)
@@ -183,11 +208,20 @@ export function shouldBehaveLikeWithdraw() {
                   // alice approve farming range
                   await this.farming.stakingTokenAsAlice.approve(this.farming.farmingRange.address, parseEther("100"));
                   // alice deposit @block number #(mockedBlock+7)
-                  await this.farming.farmingRangeAsAlice.deposit(constants.Zero, parseEther("100"));
+                  await this.farming.farmingRangeAsAlice.deposit(
+                    constants.Zero,
+                    parseEther("100"),
+                    this.signers.user.address,
+                  );
                   await advanceBlockTo(this.farming.mockedBlock.add(8).toNumber());
                   // alice withdraw @block number #(mockedBlock+8)
                   await advanceBlockTo(this.farming.mockedBlock.add(20).toNumber());
-                  await this.farming.farmingRangeAsAlice.withdraw(constants.Zero, parseEther("100"));
+                  await this.farming.farmingRangeAsAlice.withdraw(
+                    constants.Zero,
+                    parseEther("100"),
+                    this.signers.user.address,
+                    this.signers.user.address,
+                  );
 
                   expect(await this.farming.stakingToken.balanceOf(this.signers.user.address)).to.eq(parseEther("100"));
                   expect((await this.farming.farmingRangeAsAlice.campaignInfo(constants.Zero)).totalStaked).to.eq(
@@ -225,11 +259,20 @@ export function shouldBehaveLikeWithdraw() {
                   // alice approve farming range
                   await this.farming.stakingTokenAsAlice.approve(this.farming.farmingRange.address, parseEther("100"));
                   // alice deposit @block number #(mockedBlock+6)
-                  await this.farming.farmingRangeAsAlice.deposit(constants.Zero, parseEther("100"));
+                  await this.farming.farmingRangeAsAlice.deposit(
+                    constants.Zero,
+                    parseEther("100"),
+                    this.signers.user.address,
+                  );
                   // alice withdraw @block number #(mockedBlock+7)
                   await advanceBlockTo(this.farming.mockedBlock.add(10).toNumber());
 
-                  await this.farming.farmingRangeAsAlice.withdraw(constants.Zero, parseEther("100"));
+                  await this.farming.farmingRangeAsAlice.withdraw(
+                    constants.Zero,
+                    parseEther("100"),
+                    this.signers.user.address,
+                    this.signers.user.address,
+                  );
 
                   expect(await this.farming.stakingToken.balanceOf(this.signers.user.address)).to.eq(parseEther("100"));
                   expect((await this.farming.farmingRangeAsAlice.campaignInfo(constants.Zero)).totalStaked).to.eq(
@@ -267,10 +310,19 @@ export function shouldBehaveLikeWithdraw() {
                   // alice approve farming range
                   await this.farming.stakingTokenAsAlice.approve(this.farming.farmingRange.address, parseEther("100"));
                   // alice deposit @block number #(mockedBlock+6)
-                  await this.farming.farmingRangeAsAlice.deposit(constants.Zero, parseEther("100"));
+                  await this.farming.farmingRangeAsAlice.deposit(
+                    constants.Zero,
+                    parseEther("100"),
+                    this.signers.user.address,
+                  );
                   // alice withdraw @block number #(mockedBlock+7)
                   await advanceBlockTo(this.farming.mockedBlock.add(11).toNumber());
-                  await this.farming.farmingRangeAsAlice.withdraw(constants.Zero, parseEther("100"));
+                  await this.farming.farmingRangeAsAlice.withdraw(
+                    constants.Zero,
+                    parseEther("100"),
+                    this.signers.user.address,
+                    this.signers.user.address,
+                  );
 
                   expect(await this.farming.stakingToken.balanceOf(this.signers.user.address)).to.eq(parseEther("100"));
                   expect((await this.farming.farmingRangeAsAlice.campaignInfo(constants.Zero)).totalStaked).to.eq(
@@ -313,9 +365,18 @@ export function shouldBehaveLikeWithdraw() {
                 // advanced block to 100
                 await advanceBlockTo(toBeAdvancedBlockNum.add(100).toNumber());
                 // alice deposit @block number #(mockedBlock+9+100)
-                await this.farming.farmingRangeAsAlice.deposit(constants.Zero, parseEther("100"));
+                await this.farming.farmingRangeAsAlice.deposit(
+                  constants.Zero,
+                  parseEther("100"),
+                  this.signers.user.address,
+                );
                 // alice withdraw @block number #(mockedBlock+10+100)
-                await this.farming.farmingRangeAsAlice.withdraw(constants.Zero, parseEther("100"));
+                await this.farming.farmingRangeAsAlice.withdraw(
+                  constants.Zero,
+                  parseEther("100"),
+                  this.signers.user.address,
+                  this.signers.user.address,
+                );
 
                 expect(await this.farming.stakingToken.balanceOf(this.signers.user.address)).to.eq(parseEther("100"));
                 expect((await this.farming.farmingRangeAsAlice.campaignInfo(constants.Zero)).totalStaked).to.eq(
@@ -367,10 +428,18 @@ export function shouldBehaveLikeWithdraw() {
               await this.farming.stakingTokenAsBob.approve(this.farming.farmingRange.address, parseEther("100"));
 
               // alice deposit @block number #(mockedBlock+10)
-              await this.farming.farmingRangeAsAlice.deposit(constants.Zero, parseEther("100"));
+              await this.farming.farmingRangeAsAlice.deposit(
+                constants.Zero,
+                parseEther("100"),
+                this.signers.user.address,
+              );
               await advanceBlockTo(this.farming.mockedBlock.add(11).toNumber());
               // bob deposit @block number #(mockedBlock+12)
-              await this.farming.farmingRangeAsBob.deposit(constants.Zero, parseEther("100"));
+              await this.farming.farmingRangeAsBob.deposit(
+                constants.Zero,
+                parseEther("100"),
+                this.signers.feeTo.address,
+              );
 
               const currentBlockNum = await latestBlockNumber();
               // alice should expect to see her pending reward according to calculated reward per share and her deposit
@@ -382,8 +451,18 @@ export function shouldBehaveLikeWithdraw() {
               await advanceBlockTo(this.farming.mockedBlock.add(21).toNumber());
               // 2 from last acc reward + ((10*200)/200 = 2000/200 = 10 from second acc reward)
 
-              await this.farming.farmingRangeAsAlice.withdraw(constants.Zero, parseEther("100"));
-              await this.farming.farmingRangeAsBob.withdraw(constants.Zero, parseEther("100"));
+              await this.farming.farmingRangeAsAlice.withdraw(
+                constants.Zero,
+                parseEther("100"),
+                this.signers.user.address,
+                this.signers.user.address,
+              );
+              await this.farming.farmingRangeAsBob.withdraw(
+                constants.Zero,
+                parseEther("100"),
+                this.signers.feeTo.address,
+                this.signers.feeTo.address,
+              );
 
               // (10*200)/200 = 2000/200 = 10
               expect(await this.farming.stakingToken.balanceOf(this.signers.user.address)).to.eq(parseEther("100"));
@@ -436,11 +515,19 @@ export function shouldBehaveLikeWithdraw() {
               await this.farming.stakingTokenAsBob.approve(this.farming.farmingRange.address, parseEther("100"));
 
               // alice deposit @block number #(mockedBlock+10)
-              await this.farming.farmingRangeAsAlice.deposit(constants.Zero, parseEther("100"));
+              await this.farming.farmingRangeAsAlice.deposit(
+                constants.Zero,
+                parseEther("100"),
+                this.signers.user.address,
+              );
               // skip to phase 2
               await advanceBlockTo(this.farming.mockedBlock.add(13).toNumber());
               // bob deposit @block number #(mockedBlock+14)
-              await this.farming.farmingRangeAsBob.deposit(constants.Zero, parseEther("100"));
+              await this.farming.farmingRangeAsBob.deposit(
+                constants.Zero,
+                parseEther("100"),
+                this.signers.feeTo.address,
+              );
               const currentBlockNum = await latestBlockNumber();
 
               // alice should expect to see her pending reward according to calculated reward per share and her deposit
@@ -453,8 +540,18 @@ export function shouldBehaveLikeWithdraw() {
               );
               await advanceBlockTo(this.farming.mockedBlock.add(21).toNumber());
 
-              await this.farming.farmingRangeAsAlice.withdraw(constants.Zero, parseEther("100"));
-              await this.farming.farmingRangeAsBob.withdraw(constants.Zero, parseEther("100"));
+              await this.farming.farmingRangeAsAlice.withdraw(
+                constants.Zero,
+                parseEther("100"),
+                this.signers.user.address,
+                this.signers.user.address,
+              );
+              await this.farming.farmingRangeAsBob.withdraw(
+                constants.Zero,
+                parseEther("100"),
+                this.signers.feeTo.address,
+                this.signers.feeTo.address,
+              );
 
               expect(await this.farming.stakingToken.balanceOf(this.signers.user.address)).to.eq(parseEther("100"));
               expect(await this.farming.stakingToken.balanceOf(this.signers.feeTo.address)).to.eq(parseEther("100"));
@@ -519,10 +616,10 @@ export function shouldBehaveLikeWithdraw() {
 
           // ### campaign 0 ###
           // alice deposit @block number #(mockedBlock+11)
-          await this.farming.farmingRangeAsAlice.deposit(constants.Zero, parseEther("100"));
+          await this.farming.farmingRangeAsAlice.deposit(constants.Zero, parseEther("100"), this.signers.user.address);
           await advanceBlockTo(this.farming.mockedBlock.add(12).toNumber());
           // bob deposit @block number #(mockedBlock+13)
-          await this.farming.farmingRangeAsBob.deposit(constants.Zero, parseEther("200"));
+          await this.farming.farmingRangeAsBob.deposit(constants.Zero, parseEther("200"), this.signers.feeTo.address);
           let currentBlockNum = await latestBlockNumber();
 
           // alice should expect to see her pending reward according to calculated reward per share and her deposit
@@ -533,8 +630,18 @@ export function shouldBehaveLikeWithdraw() {
           );
           expect((await this.farming.farmingRangeAsAlice.campaignInfo(0)).totalStaked).to.eq(parseEther("300"));
 
-          await this.farming.farmingRangeAsAlice.withdraw(constants.Zero, parseEther("100"));
-          await this.farming.farmingRangeAsBob.withdraw(constants.Zero, parseEther("200"));
+          await this.farming.farmingRangeAsAlice.withdraw(
+            constants.Zero,
+            parseEther("100"),
+            this.signers.user.address,
+            this.signers.user.address,
+          );
+          await this.farming.farmingRangeAsBob.withdraw(
+            constants.Zero,
+            parseEther("200"),
+            this.signers.feeTo.address,
+            this.signers.feeTo.address,
+          );
 
           expect(await this.farming.stakingToken.balanceOf(this.signers.user.address)).to.eq(parseEther("1000"));
           expect(await this.farming.stakingToken.balanceOf(this.signers.feeTo.address)).to.eq(parseEther("1000"));
@@ -552,10 +659,10 @@ export function shouldBehaveLikeWithdraw() {
           // ### campaign 1 ##
           await advanceBlockTo(this.farming.mockedBlock.add(18).toNumber());
           // alice deposit @block number #(mockedBlock+19)
-          await this.farming.farmingRangeAsAlice.deposit(constants.One, parseEther("400"));
+          await this.farming.farmingRangeAsAlice.deposit(constants.One, parseEther("400"), this.signers.user.address);
           await advanceBlockTo(this.farming.mockedBlock.add(24).toNumber());
           // bob deposit @block number #(mockedBlock+25)
-          await this.farming.farmingRangeAsBob.deposit(constants.One, parseEther("600"));
+          await this.farming.farmingRangeAsBob.deposit(constants.One, parseEther("600"), this.signers.feeTo.address);
 
           currentBlockNum = await latestBlockNumber();
 
@@ -568,8 +675,18 @@ export function shouldBehaveLikeWithdraw() {
           );
           expect((await this.farming.farmingRangeAsAlice.campaignInfo(1)).totalStaked).to.eq(parseEther("1000"));
 
-          await this.farming.farmingRangeAsAlice.withdraw(constants.One, parseEther("400"));
-          await this.farming.farmingRangeAsBob.withdraw(constants.One, parseEther("600"));
+          await this.farming.farmingRangeAsAlice.withdraw(
+            constants.One,
+            parseEther("400"),
+            this.signers.user.address,
+            this.signers.user.address,
+          );
+          await this.farming.farmingRangeAsBob.withdraw(
+            constants.One,
+            parseEther("600"),
+            this.signers.feeTo.address,
+            this.signers.feeTo.address,
+          );
           // alice should expect to see her  reward according to calculated reward per share and her deposit
 
           expect((await this.farming.farmingRangeAsAlice.campaignInfo(constants.One)).totalStaked).to.eq(
@@ -586,6 +703,74 @@ export function shouldBehaveLikeWithdraw() {
             parseEther("386.666666666666666664"),
           );
         });
+      });
+    });
+    context("With recipient address != msg.sender", async function () {
+      it("should receive reward tokens and send staking tokens to different address", async function () {
+        const rewardToken = this.farming.rewardToken;
+        const stakingToken = this.farming.stakingToken;
+
+        await addCampaignAndCreateRewards(this.farming, this.signers.user.address, this.signers.admin.address);
+
+        await this.farming.farmingRangeAsAlice.withdraw(
+          0,
+          parseEther("100"),
+          this.signers.user.address,
+          this.signers.feeTo.address,
+        );
+
+        expect(await rewardToken.balanceOf(this.signers.user.address)).to.eq(parseEther("100"));
+        expect(await rewardToken.balanceOf(this.signers.feeTo.address)).to.eq(0);
+        expect((await this.farming.farmingRangeAsAlice.campaignInfo(0)).totalStaked).to.eq(0);
+        expect(await stakingToken.balanceOf(this.signers.user.address)).to.eq(0);
+        expect(await stakingToken.balanceOf(this.signers.feeTo.address)).to.eq(parseEther("100"));
+      });
+      it("should send reward and staking tokens to different address", async function () {
+        const rewardToken = this.farming.rewardToken;
+        const stakingToken = this.farming.stakingToken;
+
+        await addCampaignAndCreateRewards(this.farming, this.signers.user.address, this.signers.admin.address);
+
+        await this.farming.farmingRangeAsAlice.withdraw(
+          0,
+          parseEther("100"),
+          this.signers.feeTo.address,
+          this.signers.feeTo.address,
+        );
+
+        expect(await rewardToken.balanceOf(this.signers.user.address)).to.eq(0);
+        expect(await rewardToken.balanceOf(this.signers.feeTo.address)).to.eq(parseEther("100"));
+        expect((await this.farming.farmingRangeAsAlice.campaignInfo(0)).totalStaked).to.eq(0);
+        expect(await stakingToken.balanceOf(this.signers.user.address)).to.eq(0);
+        expect(await stakingToken.balanceOf(this.signers.feeTo.address)).to.eq(parseEther("100"));
+      });
+      it("should revert if _rewardTo or _stakingTo is address(0)", async function () {
+        const rewardToken = this.farming.rewardToken;
+        const stakingToken = this.farming.stakingToken;
+
+        await addCampaignAndCreateRewards(this.farming, this.signers.user.address, this.signers.admin.address);
+
+        await expect(
+          this.farming.farmingRangeAsAlice.withdraw(
+            0,
+            parseEther("100"),
+            constants.AddressZero,
+            this.signers.user2.address,
+          ),
+        ).to.be.revertedWith("FarmingRange::withdraw::bad _rewardTo");
+
+        await expect(
+          this.farming.farmingRangeAsAlice.withdraw(
+            0,
+            parseEther("100"),
+            this.signers.user2.address,
+            constants.AddressZero,
+          ),
+        ).to.be.revertedWith("FarmingRange::withdraw::bad _stakingTo");
+
+        expect(await rewardToken.balanceOf(this.signers.user.address)).to.eq(0);
+        expect((await this.farming.farmingRangeAsAlice.campaignInfo(0)).totalStaked).to.eq(parseEther("100"));
+        expect(await stakingToken.balanceOf(this.signers.user.address)).to.eq(0);
       });
     });
   });

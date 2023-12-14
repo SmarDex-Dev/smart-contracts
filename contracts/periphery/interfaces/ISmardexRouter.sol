@@ -8,6 +8,69 @@ import "../../core/libraries/SmardexLibrary.sol";
 
 interface ISmardexRouter is ISmardexSwapCallback, ISmardexMintCallback {
     /**
+     * @notice parameters used by the addLiquidity function
+     * @param tokenA address of the first token in the pair
+     * @param tokenB address of the second token in the pair
+     * @param amountADesired The amount of tokenA to add as liquidity
+     * if the B/A price is <= amountBDesired/amountADesired
+     * @param amountBDesired The amount of tokenB to add as liquidity
+     * if the A/B price is <= amountADesired/amountBDesired
+     * @param amountAMin Bounds the extent to which the B/A price can go up before the transaction reverts.
+     * Must be <= amountADesired.
+     * @param amountBMin Bounds the extent to which the A/B price can go up before the transaction reverts.
+     * Must be <= amountBDesired.
+     * @param fictiveReserveB The fictive reserve of tokenB at time of submission
+     * @param fictiveReserveAMin The minimum fictive reserve of tokenA indicating the extent to which the A/B price can
+     * go down
+     * @param fictiveReserveAMax The maximum fictive reserve of tokenA indicating the extent to which the A/B price can
+     * go up
+     */
+    struct AddLiquidityParams {
+        address tokenA;
+        address tokenB;
+        uint256 amountADesired;
+        uint256 amountBDesired;
+        uint256 amountAMin;
+        uint256 amountBMin;
+        uint128 fictiveReserveB;
+        uint128 fictiveReserveAMin;
+        uint128 fictiveReserveAMax;
+    }
+
+    /**
+     * @notice parameters used by the addLiquidityETH function
+     * @param token A pool token.
+     * @param amountTokenDesired The amount of token to add as liquidity if the WETH/token price
+     * is <= msg.value/amountTokenDesired (token depreciates).
+     * @param amountTokenMin Bounds the extent to which the WETH/token price can go up before the transaction reverts.
+     * Must be <= amountTokenDesired.
+     * @param amountETHMin Bounds the extent to which the token/WETH price can go up before the transaction reverts.
+     * Must be <= msg.value.
+     * @param fictiveReserveETH The fictive reserve of wETH at time of submission
+     * @param fictiveReserveTokenMin The minimum fictive reserve of the token indicating the extent to which the token
+     * price can go up
+     * @param fictiveReserveTokenMax The maximum fictive reserve of the token indicating the extent to which the token
+     * price can go down
+     */
+    struct AddLiquidityETHParams {
+        address token;
+        uint256 amountTokenDesired;
+        uint256 amountTokenMin;
+        uint256 amountETHMin;
+        uint128 fictiveReserveETH;
+        uint128 fictiveReserveTokenMin;
+        uint128 fictiveReserveTokenMax;
+    }
+
+    /**
+     * @notice emitted when a pair is added to the whitelist
+     * @param tokenA address of one of the token of the pair
+     * @param tokenB address of the other token of the pair
+     * @param pair whitelisted pair address
+     */
+    event PairWhitelisted(address tokenA, address tokenB, address pair);
+
+    /**
      * @notice get the factory address
      * @return address of the factory
      */
@@ -20,17 +83,17 @@ interface ISmardexRouter is ISmardexSwapCallback, ISmardexMintCallback {
     function WETH() external view returns (address);
 
     /**
-     * @notice Add liquidity to an ERC-20=ERC-20 pool. Receive liquidity token to materialize shares in the pool
+     * @notice Add pair to the whitelist if it's also present in the factory whitelist
+     * @dev this function is callable by anyone, only the pairs also whitelisted by the factory will be accepted.
      * @param _tokenA address of the first token in the pair
      * @param _tokenB address of the second token in the pair
-     * @param _amountADesired The amount of tokenA to add as liquidity
-     * if the B/A price is <= amountBDesired/amountADesired
-     * @param _amountBDesired The amount of tokenB to add as liquidity
-     * if the A/B price is <= amountADesired/amountBDesired
-     * @param _amountAMin Bounds the extent to which the B/A price can go up before the transaction reverts.
-     * Must be <= amountADesired.
-     * @param _amountBMin Bounds the extent to which the A/B price can go up before the transaction reverts.
-     * Must be <= amountBDesired.
+     * @return pair_ address of the created pair
+     */
+    function addPairToWhitelist(address _tokenA, address _tokenB) external returns (address pair_);
+
+    /**
+     * @notice Add liquidity to an ERC-20=ERC-20 pool. Receive liquidity token to materialize shares in the pool
+     * @param _params all the parameters required to add liquidity from struct AddLiquidityParams
      * @param _to Recipient of the liquidity tokens.
      * @param _deadline Unix timestamp after which the transaction will revert.
      * @return amountA_ The amount of tokenA sent to the pool.
@@ -38,12 +101,7 @@ interface ISmardexRouter is ISmardexSwapCallback, ISmardexMintCallback {
      * @return liquidity_ The amount of liquidity tokens minted.
      */
     function addLiquidity(
-        address _tokenA,
-        address _tokenB,
-        uint256 _amountADesired,
-        uint256 _amountBDesired,
-        uint256 _amountAMin,
-        uint256 _amountBMin,
+        AddLiquidityParams calldata _params,
         address _to,
         uint256 _deadline
     ) external returns (uint256 amountA_, uint256 amountB_, uint256 liquidity_);
@@ -51,13 +109,7 @@ interface ISmardexRouter is ISmardexSwapCallback, ISmardexMintCallback {
     /**
      * @notice Adds liquidity to an ERC-20=WETH pool with ETH. msg.value is the amount of ETH to add as liquidity.
      * if the token/WETH price is <= amountTokenDesired/msg.value (WETH depreciates).
-     * @param _token A pool token.
-     * @param _amountTokenDesired The amount of token to add as liquidity if the WETH/token price
-     * is <= msg.value/amountTokenDesired (token depreciates).
-     * @param _amountTokenMin Bounds the extent to which the WETH/token price can go up before the transaction reverts.
-     * Must be <= amountTokenDesired.
-     * @param _amountETHMin Bounds the extent to which the token/WETH price can go up before the transaction reverts.
-     * Must be <= msg.value.
+     * @param _params all the parameters required to add liquidity from struct AddLiquidityETHParams
      * @param _to Recipient of the liquidity tokens.
      * @param _deadline Unix timestamp after which the transaction will revert.
      * @return amountToken_ The amount of token sent to the pool.
@@ -65,10 +117,7 @@ interface ISmardexRouter is ISmardexSwapCallback, ISmardexMintCallback {
      * @return liquidity_ The amount of liquidity tokens minted.
      */
     function addLiquidityETH(
-        address _token,
-        uint256 _amountTokenDesired,
-        uint256 _amountTokenMin,
-        uint256 _amountETHMin,
+        AddLiquidityETHParams calldata _params,
         address _to,
         uint256 _deadline
     ) external payable returns (uint256 amountToken_, uint256 amountETH_, uint256 liquidity_);
@@ -396,4 +445,108 @@ interface ISmardexRouter is ISmardexSwapCallback, ISmardexMintCallback {
             uint256 newFictiveReserveIn_,
             uint256 newFictiveReserveOut_
         );
+
+    /**
+     * @notice perform a swapExactTokensForTokens with a permit for the entry token
+     * @param _amountIn The amount of input tokens to send.
+     * @param _amountOutMin The minimum amount of output tokens that must be received for the transaction not to revert.
+     * @param _path An array of token addresses. path.length must be >= 2. Pools for each consecutive pair of addresses
+     * must exist and have liquidity.
+     * @param _to Recipient of the output tokens.
+     * @param _deadline unix timestamp after which the transaction will revert
+     * @param _approveMax Whether the approval amount in the signature is for uint(-1) (true) or _amountIn (false).
+     * @param _v The v component of the permit signature.
+     * @param _r The r component of the permit signature.
+     * @param _s The s component of the permit signature.
+     * @return amountOut_ The output token amount.
+     */
+    function swapExactTokensForTokensWithPermit(
+        uint256 _amountIn,
+        uint256 _amountOutMin,
+        address[] calldata _path,
+        address _to,
+        uint256 _deadline,
+        bool _approveMax,
+        uint8 _v,
+        bytes32 _r,
+        bytes32 _s
+    ) external returns (uint256 amountOut_);
+
+    /**
+     * @notice Perform a swapTokensForExactTokens with a permit for the entry token
+     * @param _amountOut The amount of output tokens to receive.
+     * @param _amountInMax The maximum amount of input tokens that can be required before the transaction reverts.
+     * @param _path An array of token addresses. path.length must be >= 2. Pools for each consecutive pair of addresses
+     * must exist and have liquidity.
+     * @param _to Recipient of the output tokens.
+     * @param _deadline Unix timestamp after which the transaction will revert
+     * @param _approveMax Whether the approval amount in the signature is for uint(-1) (true) or _amountInMax (false).
+     * @param _v The v component of the permit signature.
+     * @param _r The r component of the permit signature.
+     * @param _s The s component of the permit signature.
+     * @return amountIn_ The input token amount.
+     */
+    function swapTokensForExactTokensWithPermit(
+        uint256 _amountOut,
+        uint256 _amountInMax,
+        address[] calldata _path,
+        address _to,
+        uint256 _deadline,
+        bool _approveMax,
+        uint8 _v,
+        bytes32 _r,
+        bytes32 _s
+    ) external returns (uint256 amountIn_);
+
+    /**
+     * @notice Perform a swapTokensForExactETH with a permit for the entry token
+     * @param _amountOut The amount of output tokens to receive.
+     * @param _amountInMax The maximum amount of input tokens that can be required before the transaction reverts.
+     * @param _path An array of token addresses. path.length must be >= 2. Pools for each consecutive pair of addresses
+     * must exist and have liquidity.
+     * @param _to Recipient of the output tokens.
+     * @param _deadline Unix timestamp after which the transaction will revert
+     * @param _approveMax Whether the approval amount in the signature is for uint(-1) (true) or _amountInMax (false).
+     * @param _v The v component of the permit signature.
+     * @param _r The r component of the permit signature.
+     * @param _s The s component of the permit signature.
+     * @return amountIn_ The input token amount.
+     */
+    function swapTokensForExactETHWithPermit(
+        uint256 _amountOut,
+        uint256 _amountInMax,
+        address[] calldata _path,
+        address _to,
+        uint256 _deadline,
+        bool _approveMax,
+        uint8 _v,
+        bytes32 _r,
+        bytes32 _s
+    ) external returns (uint256 amountIn_);
+
+    /**
+     * @notice Perform a swapExactTokensForETH with a permit for the entry token
+     * @param _amountIn The amount of input tokens to send.
+     * @param _amountOutMin The minimum amount of output ETH that must be received for the transaction not to revert.
+     * @param _path An array of token addresses. path.length must be >= 2. Pools for each consecutive pair of addresses
+     * must exist and have liquidity.
+     * @param _to Recipient of the output tokens.
+     * @param _deadline Unix timestamp after which the transaction will revert
+     * @param _approveMax Whether the approval amount in the signature is for uint(-1) (true) or _amountIn (false).
+     * @param _v The v component of the permit signature.
+     * @param _r The r component of the permit signature.
+     * @param _s The s component of the permit signature.
+     * @return amountOut_ The output token amount.
+     */
+    function swapExactTokensForETHWithPermit(
+        uint256 _amountIn,
+        uint256 _amountOutMin,
+        address[] calldata _path,
+        address _to,
+        uint256 _deadline,
+        bool _approveMax,
+        uint8 _v,
+        bytes32 _r,
+        bytes32 _s
+    ) external returns (uint256 amountOut_);
 }

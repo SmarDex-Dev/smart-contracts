@@ -8,8 +8,8 @@ import "../SmardexRouter.sol";
 contract SmardexRouterTest is SmardexRouter {
     constructor(address _factory, address _WETH) SmardexRouter(_factory, _WETH) {}
 
-    function pairFor_pure(address factory, address tokenA, address tokenB) public pure returns (address pair) {
-        pair = PoolAddress.pairFor(factory, tokenA, tokenB);
+    function pairFor_pure(address factory, address tokenA, address tokenB) public view returns (address pair) {
+        pair = PoolAddress.pairFor(factory, tokenA, tokenB, whitelist);
     }
 
     function mint(address _pair, address _to, uint256 _amount0, uint256 _amount1, address _payer) public {

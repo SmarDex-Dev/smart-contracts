@@ -3,6 +3,7 @@ import { constants } from "ethers";
 import { addLiquidity } from "../utils";
 import { expect } from "chai";
 import { anyValue } from "@nomicfoundation/hardhat-chai-matchers/withArgs";
+import { getPermitSignature } from "../../utils";
 
 export function shouldBehaveLikeSwapExactTokensForTokens(): void {
   const token0Amount = parseEther("5");
@@ -98,5 +99,105 @@ export function shouldBehaveLikeSwapExactTokensForTokens(): void {
     ).to.not.be.reverted;
 
     expect(await this.contracts.token1.balanceOf(this.contracts.smardexRouter.address)).to.be.eq(expectedOutputAmount);
+  });
+
+  it("with permit", async function () {
+    const balanceAdminBefore = await this.contracts.token1.balanceOf(this.signers.admin.address);
+
+    // make sure we don't have allowance yet
+    await this.contracts.token0.approve(this.contracts.smardexRouter.address, 0);
+    const { v, r, s } = await getPermitSignature(
+      this.signers.admin,
+      this.contracts.token0,
+      this.contracts.smardexRouter.address,
+      swapAmount,
+    );
+
+    await expect(
+      this.contracts.smardexRouter.swapExactTokensForTokensWithPermit(
+        swapAmount,
+        0,
+        [this.contracts.token0.address, this.contracts.token1.address],
+        this.signers.admin.address,
+        constants.MaxUint256,
+        false,
+        v,
+        r,
+        s,
+      ),
+    )
+      .to.emit(this.contracts.token0, "Transfer")
+      .withArgs(this.signers.admin.address, this.contracts.smardexPair.address, swapAmount)
+      .to.emit(this.contracts.token1, "Transfer")
+      .withArgs(this.contracts.smardexPair.address, this.signers.admin.address, expectedOutputAmount)
+      .to.emit(this.contracts.smardexPair, "Sync")
+      .withArgs(
+        token0Amount.add(swapAmount),
+        token1Amount.sub(expectedOutputAmount),
+        anyValue,
+        anyValue,
+        token0Amount.div(2),
+        token1Amount.div(2),
+      )
+      .to.emit(this.contracts.smardexPair, "Swap")
+      .withArgs(
+        this.contracts.smardexRouter.address,
+        this.signers.admin.address,
+        swapAmount,
+        -expectedOutputAmount.toBigInt(),
+      );
+    const balanceAdminAfter = await this.contracts.token1.balanceOf(this.signers.admin.address);
+    expect(balanceAdminAfter.sub(balanceAdminBefore)).to.be.eq(expectedOutputAmount);
+  });
+
+  it("fail if permit amount doesn't match swap amount", async function () {
+    // make sure we don't have allowance yet
+    await this.contracts.token0.approve(this.contracts.smardexRouter.address, 0);
+    const { v, r, s } = await getPermitSignature(
+      this.signers.admin,
+      this.contracts.token0,
+      this.contracts.smardexRouter.address,
+      swapAmount.add(1), // different amount
+    );
+
+    await expect(
+      this.contracts.smardexRouter.swapExactTokensForTokensWithPermit(
+        swapAmount,
+        0,
+        [this.contracts.token0.address, this.contracts.token1.address],
+        this.signers.admin.address,
+        constants.MaxUint256,
+        false,
+        v,
+        r,
+        s,
+      ),
+    ).to.be.revertedWith("TransferHelper::transferFrom: transferFrom failed");
+  });
+
+  it("fail if approve max parameter is wrong", async function () {
+    // make sure we don't have allowance yet
+    await this.contracts.token0.approve(this.contracts.smardexRouter.address, 0);
+
+    const { v, r, s } = await getPermitSignature(
+      this.signers.admin,
+      this.contracts.token0,
+      this.contracts.smardexRouter.address,
+      swapAmount,
+    );
+
+    await expect(
+      this.contracts.smardexRouter.swapExactTokensForTokensWithPermit(
+        swapAmount,
+        0,
+        [this.contracts.token0.address, this.contracts.token1.address],
+        this.signers.admin.address,
+        constants.MaxUint256,
+        true, // wrong value
+        v,
+        r,
+        s,
+      ),
+    ).to.be.revertedWith("TransferHelper::transferFrom: transferFrom failed");
   });
 }

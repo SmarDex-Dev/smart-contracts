@@ -1,5 +1,9 @@
 import { BigNumber, Wallet } from "ethers";
 import { ethers } from "hardhat";
+import { readFileSync } from "fs";
+import { HardhatRuntimeEnvironment } from "hardhat/types";
+import { isV1Pair } from "./params";
+import { keccak256 } from "ethers/lib/utils";
 
 export async function sendEtherTo(qty: BigNumber, adr: string, provider: any) {
   // create signer object
@@ -27,6 +31,7 @@ export type Networks = {
   staking: boolean;
   autoswapper: string;
   rewardManager: string;
+  rewardManagerWithdrawable: string;
   farming: string;
 };
 
@@ -36,6 +41,7 @@ export const artifacts: Networks[] = [
     staking: true,
     autoswapper: "AutoSwapper",
     rewardManager: "RewardManager",
+    rewardManagerWithdrawable: "RewardManagerWithdrawable",
     farming: "FarmingRange",
   },
 
@@ -44,6 +50,7 @@ export const artifacts: Networks[] = [
     staking: true,
     autoswapper: "AutoSwapper",
     rewardManager: "RewardManager",
+    rewardManagerWithdrawable: "RewardManagerWithdrawable",
     farming: "FarmingRange",
   },
 
@@ -52,6 +59,7 @@ export const artifacts: Networks[] = [
     staking: false,
     autoswapper: "AutoSwapperL2",
     rewardManager: "RewardManagerL2Arbitrum",
+    rewardManagerWithdrawable: "RewardManagerWithdrawableArbitrum",
     farming: "FarmingRangeL2Arbitrum",
   },
 
@@ -60,6 +68,7 @@ export const artifacts: Networks[] = [
     staking: false,
     autoswapper: "AutoSwapperL2",
     rewardManager: "RewardManagerL2Arbitrum",
+    rewardManagerWithdrawable: "RewardManagerWithdrawableArbitrum",
     farming: "FarmingRangeL2Arbitrum",
   },
 
@@ -68,6 +77,7 @@ export const artifacts: Networks[] = [
     staking: false,
     autoswapper: "AutoSwapperL2",
     rewardManager: "RewardManagerL2",
+    rewardManagerWithdrawable: "RewardManagerWithdrawable",
     farming: "FarmingRange",
   },
 
@@ -76,6 +86,7 @@ export const artifacts: Networks[] = [
     staking: false,
     autoswapper: "AutoSwapperL2",
     rewardManager: "RewardManagerL2",
+    rewardManagerWithdrawable: "RewardManagerWithdrawable",
     farming: "FarmingRange",
   },
 
@@ -84,6 +95,7 @@ export const artifacts: Networks[] = [
     staking: false,
     autoswapper: "AutoSwapperL2",
     rewardManager: "RewardManagerL2",
+    rewardManagerWithdrawable: "RewardManagerWithdrawable",
     farming: "FarmingRange",
   },
 
@@ -92,6 +104,23 @@ export const artifacts: Networks[] = [
     staking: false,
     autoswapper: "AutoSwapperL2",
     rewardManager: "RewardManagerL2",
+    rewardManagerWithdrawable: "RewardManagerWithdrawable",
+    farming: "FarmingRange",
+  },
+  {
+    name: "base_testnet",
+    staking: false,
+    autoswapper: "AutoSwapperL2",
+    rewardManager: "RewardManagerL2",
+    rewardManagerWithdrawable: "RewardManagerWithdrawable",
+    farming: "FarmingRange",
+  },
+  {
+    name: "base",
+    staking: false,
+    autoswapper: "AutoSwapperL2",
+    rewardManager: "RewardManagerL2",
+    rewardManagerWithdrawable: "RewardManagerWithdrawable",
     farming: "FarmingRange",
   },
 ];
@@ -111,6 +140,7 @@ export const WETH9_addresses = {
   "250": "0x94C1e8D95F3e0d53B6d808CEb084eFE1980fAa9b", // Fantom opera
   "43114": "0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7", // Avalanche C-Chain
   "42161": "0x82af49447d8a07e3bd95bd0d56f35241523fbab1", // Arbitrum
+  "8453": "0x4200000000000000000000000000000000000006", // base
 
   // testnets
   "5": "0xFa1e53C68c045589cb5BaC4B311337c9f42e2241", // goerli
@@ -119,6 +149,7 @@ export const WETH9_addresses = {
   "80001": "0xD9f382B51Ed89A85171FB6A584e4940D1CaBE538", // mumbai - polygon
   "421613": "0xe39Ab88f8A4777030A534146A9Ca3B52bd5D43A3", // arbitrum goerli
   "11155111": "0x6C1FE2de3150EDD0fE0991FED6dA01F33938F05B", // sepolia
+  "84531": "0x4200000000000000000000000000000000000006", // base_testnet
 };
 
 export const dedicated_WETH9_mainnet = {
@@ -126,6 +157,7 @@ export const dedicated_WETH9_mainnet = {
   "56": "WBNB", // bsc
   "137": "WMATIC", // polygon
   "42161": "aeWETH", // Arbitrum
+  "8453": "WETH9", // base
 };
 
 export const dedicated_WETH9_testnet = {
@@ -135,6 +167,7 @@ export const dedicated_WETH9_testnet = {
   "97": "WBNB", // bsc-test
   "80001": "WMATIC", // mumbai - polygon
   "421613": "aeWETH", // arbitrum goerli
+  "84531": "WETH9", // base_testnet
 };
 
 type Token = {
@@ -423,6 +456,11 @@ export const chainsData = [
       },
     ],
   },
+  {
+    network: "base_testnet",
+    tokens: [],
+    pairs: [],
+  },
 ];
 
 // help parse mainnet deployments by chain id
@@ -431,6 +469,7 @@ export const mainnets: string[] = [
   "42161", // arbitrum
   "56", // bsc
   "137", // polygon
+  "8453", // base
 ];
 
 export const smardexTokens = {
@@ -438,7 +477,65 @@ export const smardexTokens = {
   [mainnets[1]]: "0xabD587f2607542723b17f14d00d99b987C29b074", // arbitrum
   [mainnets[2]]: "0xFdc66A08B0d0Dc44c17bbd471B88f49F50CdD20F", // bsc
   [mainnets[3]]: "0x6899fAcE15c14348E1759371049ab64A3a06bFA6", // polygon
+  [mainnets[4]]: "0xFd4330b0312fdEEC6d4225075b82E00493FF2e3f", // base
 };
 export default function () {
   console.log("DONE");
 }
+// hash for pair v1
+export const hashForPairL1 = 'hex"b477a06204165d50e6d795c7c216306290eff5d6015f8b65bb46002a8775b548"';
+
+// PoolAddress contract path
+export const smardexLibFile = "/../contracts/periphery/test/peripheryV2WithV1/libraries/PoolAddressV1.sol";
+
+// check and update pair v1 hash
+export async function updateHashV1(hre: HardhatRuntimeEnvironment): Promise<boolean> {
+  return new Promise(function (resolve, reject) {
+    try {
+      const content = readFileSync(__dirname + smardexLibFile, "utf8");
+      const currentHash = content?.match(/hex"((?!(ff)).+)"/g)?.[0];
+
+      hre.ethers
+        .getContractFactory("SmardexPairV1")
+        .then(function (contractFactory) {
+          const currentLocalHash = 'hex"' + keccak256(contractFactory.bytecode).slice(2) + '"';
+          if ((!isV1Pair && currentLocalHash !== currentHash) || (isV1Pair && currentHash !== hashForPairL1)) {
+            // run changehashforv1 script
+            hre
+              .run("changehashforv1", {
+                deployment: isV1Pair.toString(),
+              })
+              .then(function () {
+                resolve(isV1Pair);
+              })
+              .catch(function (e: any) {
+                reject(e.message);
+              });
+          } else {
+            resolve(isV1Pair);
+          }
+        })
+        .catch(function (e: any) {
+          reject(e.message);
+        });
+    } catch (e: any) {
+      reject(e.message);
+    }
+  });
+}
+
+const pathPrefix = "../artifacts/contracts/";
+export const abiPaths = {
+  SmardexPairV1: pathPrefix + "core/test/coreV1.sol/SmardexPairV1.json",
+  SmardexPair: pathPrefix + "core/SmardexPair.sol/SmardexPair.json",
+  WETH9: pathPrefix + "periphery/test/WETH9.sol/WETH9.json",
+  WETH9GOERLI: pathPrefix + "rewards/test/weth/mainnet/WETH9GOERLI.sol/WETH9GOERLI.json",
+  WBNB: pathPrefix + "rewards/test/weth/bsc/WBNB.sol/WBNB.json",
+  aeWETH: pathPrefix + "rewards/test/weth/arbitrum/instance/aeWETH.sol/aeWETH.json",
+  WMATIC: pathPrefix + "rewards/test/weth/polygon/WMatic.sol/WMATIC.json",
+  SmardexToken: pathPrefix + "SmardexToken/SmardexToken.sol/SmardexToken.json",
+  SmardexTokenL2: pathPrefix + "SmardexToken/SmardexTokenL2.sol/SmardexTokenL2.json",
+  FarmingRange: pathPrefix + "rewards/FarmingRange.sol/FarmingRange.json",
+  FarmingRangeL2Arbitrum: pathPrefix + "rewards/FarmingRangeL2Arbitrum.sol/FarmingRangeL2Arbitrum.json",
+  Staking: pathPrefix + "rewards/Staking.sol/Staking.json",
+};

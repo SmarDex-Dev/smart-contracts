@@ -1,5 +1,5 @@
 import { constants } from "ethers/lib/ethers";
-import { formatEther, parseEther } from "ethers/lib/utils";
+import { formatEther, parseEther, parseUnits } from "ethers/lib/utils";
 import { BigNumber } from "ethers";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
 import { expect } from "chai";
@@ -9,6 +9,7 @@ import { unitFixtureSmardexRouter, unitFixtureTokensAndPairWithFactory } from ".
 import hre from "hardhat";
 import { ERC20Test, SmardexPair, SmardexPair__factory, SmardexRouter } from "../../../typechain";
 import { deployDoubleSwapRouter } from "../../deployers";
+import { increase } from "../../helpers/time";
 
 const LOGGING = false;
 
@@ -74,12 +75,17 @@ export function checkBestTrade() {
       let worstK = amountToken0.mul(amountToken1);
       let worstKTokenIn = 0;
       await this.contracts.smardexRouter.addLiquidity(
-        this.contracts.token0.address,
-        this.contracts.token1.address,
-        amountToken0,
-        amountToken1,
-        amountToken0,
-        amountToken1,
+        {
+          tokenA: this.contracts.token0.address,
+          tokenB: this.contracts.token1.address,
+          amountADesired: amountToken0,
+          amountBDesired: amountToken1,
+          amountAMin: amountToken0,
+          amountBMin: amountToken1,
+          fictiveReserveB: amountToken1,
+          fictiveReserveAMin: amountToken0,
+          fictiveReserveAMax: amountToken0,
+        },
         this.signers.admin.address,
         constants.MaxUint256,
       );
@@ -147,12 +153,17 @@ export function checkBestTrade() {
       await this.contracts.token0.approve(this.contracts.smardexRouter.address, constants.MaxUint256);
       await this.contracts.token1.approve(this.contracts.smardexRouter.address, constants.MaxUint256);
       await this.contracts.smardexRouter.addLiquidity(
-        this.contracts.token0.address,
-        this.contracts.token1.address,
-        parseEther("15.1562258412964"),
-        parseEther("123377.063205187"),
-        1,
-        1,
+        {
+          tokenA: this.contracts.token0.address,
+          tokenB: this.contracts.token1.address,
+          amountADesired: parseEther("15.1562258412964"),
+          amountBDesired: parseEther("123377.063205187"),
+          amountAMin: 1,
+          amountBMin: 1,
+          fictiveReserveB: 0,
+          fictiveReserveAMin: 0,
+          fictiveReserveAMax: 0,
+        },
         this.signers.admin.address,
         constants.MaxUint256,
       );
@@ -316,12 +327,17 @@ export function testExploit() {
       await token1.mint(signers[1].address, parseEther("100000000"));
 
       await smardexRouter.connect(signers[0]).addLiquidity(
-        token0.address, //ETH
-        token1.address, //USDT
-        parseEther("14.0790730962204"), //ETH
-        parseEther("115392.024049914"), //USDT
-        1,
-        1,
+        {
+          tokenA: token0.address, // ETH
+          tokenB: token1.address, // USDT
+          amountADesired: parseEther("14.0790730962204"),
+          amountBDesired: parseEther("115392.024049914"),
+          amountAMin: 1,
+          amountBMin: 1,
+          fictiveReserveB: 0,
+          fictiveReserveAMin: 0,
+          fictiveReserveAMax: 0,
+        },
         signers[0].address,
         constants.MaxUint256,
       );
@@ -386,12 +402,17 @@ export function testNewSmardex() {
       await token1.connect(signers[1]).approve(doubleSwapRouter.address, constants.MaxUint256);
 
       await smardexRouter.connect(signers[0]).addLiquidity(
-        token0.address, //ETH
-        token1.address, //USDT
-        parseEther("14.0790730962204"), //ETH
-        parseEther("115392.024049914"), //USDT
-        1,
-        1,
+        {
+          tokenA: token0.address, // ETH
+          tokenB: token1.address, // USDT
+          amountADesired: parseEther("14.0790730962204"),
+          amountBDesired: parseEther("115392.024049914"),
+          amountAMin: 1,
+          amountBMin: 1,
+          fictiveReserveB: 0,
+          fictiveReserveAMin: 0,
+          fictiveReserveAMax: 0,
+        },
         signers[0].address,
         constants.MaxUint256,
       );
@@ -455,12 +476,17 @@ export function testHack() {
       await token1.connect(signers[1]).approve(doubleSwapRouter.address, constants.MaxUint256);
 
       await smardexRouter.connect(signers[0]).addLiquidity(
-        token0.address, //ETH
-        token1.address, //USDT
-        parseEther("14.0790730962204"), //ETH
-        parseEther("115392.024049914"), //USDT
-        1,
-        1,
+        {
+          tokenA: token0.address, // ETH
+          tokenB: token1.address, // USDT
+          amountADesired: parseEther("14.0790730962204"),
+          amountBDesired: parseEther("115392.024049914"),
+          amountAMin: 1,
+          amountBMin: 1,
+          fictiveReserveB: 0,
+          fictiveReserveAMin: 0,
+          fictiveReserveAMax: 0,
+        },
         signers[0].address,
         constants.MaxUint256,
       );
@@ -521,12 +547,17 @@ export function testHack4() {
     await token1.connect(signers[1]).approve(doubleSwapRouter.address, constants.MaxUint256);
 
     await smardexRouter.connect(signers[0]).addLiquidity(
-      token0.address, //ETH
-      token1.address, //USDT
-      parseEther("14.0790730962204"), //ETH
-      parseEther("115392.024049914"), //USDT
-      1,
-      1,
+      {
+        tokenA: token0.address, // ETH
+        tokenB: token1.address, // USDT
+        amountADesired: parseEther("14.0790730962204"),
+        amountBDesired: parseEther("115392.024049914"),
+        amountAMin: 1,
+        amountBMin: 1,
+        fictiveReserveB: 0,
+        fictiveReserveAMin: 0,
+        fictiveReserveAMax: 0,
+      },
       signers[0].address,
       constants.MaxUint256,
     );
@@ -592,5 +623,149 @@ export function testHack4() {
     }
     debug_log(`user gained: ${formatEther(balance1_after.sub(balance1_before))} USDT`);
     expect(bestGain).to.be.lte(0);
+  });
+}
+
+// TEST CASE 5
+export function testLiqFrontrun() {
+  it("Should not allow adding liquidity on unbalanced fictive reserves", async function () {
+    const [attacker, victim] = await hre.ethers.getSigners();
+    const { smardexRouter, factory } = await unitFixtureSmardexRouter();
+    const { token0, token1 } = await unitFixtureTokensAndPairWithFactory(factory);
+
+    await token0.mint(attacker.address, parseEther("1000000")); //DAI
+    await token1.mint(attacker.address, parseEther("1000000")); //USDT
+    await token0.mint(victim.address, parseEther("1000000")); //DAI
+    await token1.mint(victim.address, parseEther("1000000")); //USDT
+    await token0.connect(attacker).approve(smardexRouter.address, constants.MaxUint256);
+    await token1.connect(attacker).approve(smardexRouter.address, constants.MaxUint256);
+    await token0.connect(victim).approve(smardexRouter.address, constants.MaxUint256);
+    await token1.connect(victim).approve(smardexRouter.address, constants.MaxUint256);
+
+    await smardexRouter.connect(attacker).addLiquidity(
+      {
+        tokenA: token0.address,
+        tokenB: token1.address,
+        amountADesired: parseEther("1"),
+        amountBDesired: 100,
+        amountAMin: 0,
+        amountBMin: 0,
+        fictiveReserveB: 0,
+        fictiveReserveAMin: 0,
+        fictiveReserveAMax: 0,
+      },
+      attacker.address,
+      constants.MaxUint256,
+    );
+
+    const smardexPairContract = SmardexPair__factory.connect(
+      await factory.getPair(token0.address, token1.address),
+      attacker,
+    );
+
+    debug_log("Attacker added liquidity, reserves : ");
+    await show_reserves({
+      smardexPair: smardexPairContract,
+    });
+
+    await smardexRouter
+      .connect(attacker)
+      .swapExactTokensForTokens(
+        parseEther("0.5"),
+        0,
+        [token1.address, token0.address],
+        attacker.address,
+        constants.MaxUint256,
+      );
+
+    debug_log("Attacker swapped, reserves : ");
+    await show_reserves({
+      smardexPair: smardexPairContract,
+    });
+
+    // since reserves were at 0 when user submitted tx, he uses his own desired amounts for the price slippage
+    await expect(
+      smardexRouter.connect(victim).addLiquidity(
+        {
+          tokenA: token0.address,
+          tokenB: token1.address,
+          amountADesired: parseEther("1000000"),
+          amountBDesired: parseEther("1000000"),
+          amountAMin: parseEther("990000"), // slippage 1%
+          amountBMin: parseEther("990000"),
+          fictiveReserveB: parseEther("1000000"),
+          fictiveReserveAMin: parseEther("990000"), // slippage 1%
+          fictiveReserveAMax: parseEther("1010000"), // slippage 1%
+        },
+        victim.address,
+        constants.MaxUint256,
+      ),
+    ).to.be.revertedWith("SmarDexRouter: PRICE_TOO_LOW"); // should revert thanks to fix
+
+    // Re-establishing balanced fictive reserves
+    await increase(BigNumber.from(300));
+    await smardexRouter
+      .connect(victim)
+      .swapExactTokensForTokens(
+        parseUnits("6.4", "gwei"),
+        0,
+        [token0.address, token1.address],
+        victim.address,
+        constants.MaxUint256,
+      );
+    debug_log("Waited 5 minutes then made a swap, reserves : ");
+    await show_reserves({
+      smardexPair: smardexPairContract,
+    });
+    await increase(BigNumber.from(300));
+    await smardexRouter
+      .connect(victim)
+      .swapExactTokensForTokens(
+        parseEther("0.0203"),
+        0,
+        [token1.address, token0.address],
+        victim.address,
+        constants.MaxUint256,
+      );
+    debug_log("Waited 5 minutes then made another swap, reserves : ");
+    await show_reserves({
+      smardexPair: smardexPairContract,
+    });
+    await expect(
+      smardexRouter.connect(victim).addLiquidity(
+        {
+          tokenA: token0.address,
+          tokenB: token1.address,
+          amountADesired: parseEther("1000000"),
+          amountBDesired: parseEther("1000000"),
+          amountAMin: parseEther("990000"), // slippage 1%
+          amountBMin: parseEther("990000"),
+          fictiveReserveB: parseEther("1000000"),
+          fictiveReserveAMin: parseEther("990000"), // slippage 1%
+          fictiveReserveAMax: parseEther("1010000"), // slippage 1%
+        },
+        victim.address,
+        constants.MaxUint256,
+      ),
+    ).to.not.be.reverted;
+    debug_log("User deposited liquidity, reserves : ");
+    await show_reserves({
+      smardexPair: smardexPairContract,
+    });
+
+    await increase(BigNumber.from(300));
+    await smardexRouter
+      .connect(victim)
+      .swapExactTokensForTokens(
+        parseEther("0.1"),
+        0,
+        [token1.address, token0.address],
+        victim.address,
+        constants.MaxUint256,
+      );
+    debug_log("After 5 minutes, any swap will restore the reserves in a normal range : ");
+    await show_reserves({
+      smardexPair: smardexPairContract,
+    });
   });
 }

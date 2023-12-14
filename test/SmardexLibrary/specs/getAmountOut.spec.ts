@@ -13,6 +13,7 @@ import {
 } from "../utils";
 
 import values_fees from "../values_fees.json";
+import { SmardexLibraryTest } from "../../../typechain";
 
 // array of params for getAmountOut
 const amountsOutParams: GetAmountParametersStruct[] = getAmountsParams(SIDE_AMOUNT_OUT);
@@ -54,7 +55,7 @@ export function shouldBehaveLikeGetAmountOut(): void {
         feesPool: FEES_POOL,
       };
 
-      const result = await this.contracts.smardexLibraryTest.getAmountOut(args);
+      const result = await (this.contracts.smardexLibraryTest as SmardexLibraryTest).getAmountOut(args);
 
       await isInRange(result.amountOut_, getAmountTestCase.amountOutToken1, PCT, BASE);
       await isInRange(result.newReserveIn_, getAmountTestCase.expectedReserveToken0, PCT, BASE);
@@ -139,7 +140,7 @@ export function shouldBehaveLikeGetAmountOut(): void {
         feesPool: BigNumber.from(getAmountTestCase.feesPool),
       };
 
-      const result = await this.contracts.smardexLibraryTest.getAmountOut(args);
+      const result = await (this.contracts.smardexLibraryTest as SmardexLibraryTest).getAmountOut(args);
 
       await isInRange(result.amountOut_, parseEther(getAmountTestCase.amountOutToken1), PCT, BASE);
       await isInRange(result.newReserveIn_, parseEther(getAmountTestCase.expectedReserveToken0), PCT, BASE);

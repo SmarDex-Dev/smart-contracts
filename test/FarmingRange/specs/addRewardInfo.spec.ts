@@ -5,6 +5,34 @@ import { advanceBlockTo } from "../../helpers/time";
 export function shouldBehaveLikeAddRewardInfo() {
   describe("#addRewardInfo()", async function () {
     context("When all parameters are valid", async function () {
+      context("When the current reward period has ended and reward = 0", async function () {
+        it("should still be able to add RewardInfo", async function () {
+          const mintedRewardPhase1 = INITIAL_BONUS_REWARD_PER_BLOCK.mul(
+            this.farming.mockedBlock.add(10).sub(this.farming.mockedBlock.add(8)),
+          );
+          const mintedRewardPhase2 = INITIAL_BONUS_REWARD_PER_BLOCK.mul(
+            this.farming.mockedBlock.add(12).sub(this.farming.mockedBlock.add(10)),
+          );
+          const mintedReward = mintedRewardPhase1.add(mintedRewardPhase2);
+          await this.farming.rewardTokenAsDeployer.mint(this.signers.admin.address, mintedReward);
+          await this.farming.farmingRangeAsDeployer.addCampaignInfo(
+            this.farming.stakingToken.address,
+            this.farming.rewardToken.address,
+            this.farming.mockedBlock.add(8),
+          );
+
+          await this.farming.farmingRangeAsDeployer.addRewardInfo(
+            0,
+            this.farming.mockedBlock.add(10),
+            INITIAL_BONUS_REWARD_PER_BLOCK,
+          );
+          await advanceBlockTo(this.farming.mockedBlock.add(100).toNumber());
+
+          await expect(this.farming.farmingRangeAsDeployer.addRewardInfo(0, this.farming.mockedBlock.add(12), 0))
+            .to.emit(this.farming.farmingRangeAsDeployer, "AddRewardInfo")
+            .withArgs(0, 1, this.farming.mockedBlock.add(12), 0);
+        });
+      });
       context("When the reward info is still within the limit", async function () {
         it("should still be able to push the new reward info with the latest as the newly pushed reward info", async function () {
           const mintedRewardPhase1 = INITIAL_BONUS_REWARD_PER_BLOCK.mul(
@@ -140,7 +168,7 @@ export function shouldBehaveLikeAddRewardInfo() {
           ).to.be.revertedWith("FarmingRange::addRewardInfo::bad new endblock");
         });
       });
-      context("When the current reward period has ended", async function () {
+      context("When the current reward period has ended and reward > 0", async function () {
         it("should reverted with the message FarmingRange::addRewardInfo::reward period ended", async function () {
           const mintedRewardPhase1 = INITIAL_BONUS_REWARD_PER_BLOCK.mul(
             this.farming.mockedBlock.add(10).sub(this.farming.mockedBlock.add(8)),

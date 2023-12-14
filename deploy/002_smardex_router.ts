@@ -1,8 +1,14 @@
-import { DeployFunction, DeployResult } from "hardhat-deploy/types";
+import { DeployFunction, DeployResult, DeployOptions } from "hardhat-deploy/types";
 import { Contract } from "ethers";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
-
-import { WETH9_addresses, dedicated_WETH9_mainnet, dedicated_WETH9_testnet, argsWethArbitrumGoerli } from "./utils";
+import {
+  WETH9_addresses,
+  dedicated_WETH9_mainnet,
+  dedicated_WETH9_testnet,
+  argsWethArbitrumGoerli,
+  updateHashV1,
+  abiPaths,
+} from "./utils";
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployments, getNamedAccounts, getChainId } = hre;
@@ -14,7 +20,6 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   let wethArtifact: string = "WETH9GOERLI";
 
   const factoryArtifact: string = "SmardexFactory";
-
   const factory = await deployments.get(factoryArtifact);
 
   // WETH settings
@@ -49,19 +54,34 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   } else {
     // weth save only
     WETH = await getContractAt(wethArtifact, WETH9_addresses[chainId as keyof typeof WETH9_addresses]);
-    const wethFactory = await hre.ethers.getContractFactory(wethArtifact);
+
     await save(wethArtifact, {
       address: WETH.address,
-      abi: JSON.parse(wethFactory.interface.format("json") as string),
+      abi: (await import(abiPaths[wethArtifact as keyof typeof abiPaths])).abi,
     });
   }
 
-  // router deployment
-  await deploy("SmardexRouter", {
+  const isV1Pair = await updateHashV1(hre);
+  const routerArtifact: string = isV1Pair ? "SmardexRouterV2" : "SmardexRouter";
+
+  // Current SmardexRouter
+  let options: DeployOptions = {
     from: admin,
     args: [factory.address, WETH.address],
     log: true,
-  });
+  };
+
+  // SmardexRouter deployment
+  // will come from precompiled
+  // bytecode compliant with Factory V1
+  if (chainId === "1" && isV1Pair) {
+    options = {
+      ...options,
+      args: [factory.address, WETH9_addresses["1"]],
+    };
+  }
+
+  await deploy(routerArtifact, options);
 };
 export default func;
 func.tags = ["SmardexRouter"];

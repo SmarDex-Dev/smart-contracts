@@ -70,7 +70,7 @@ export function shouldRefundRewardManager() {
         // Since no deposits need to be made in Phase 1, we will proceed directly to Phase 2.
         await advanceBlockTo(this.farming.mockedBlock.add(24).toNumber());
         // bob deposit @block number #(mockedBlock+24)
-        await this.farming.farmingRangeAsBob.deposit(constants.Zero, parseEther("100"));
+        await this.farming.farmingRangeAsBob.deposit(constants.Zero, parseEther("100"), this.signers.feeTo.address);
 
         // Get pending reward @block number #(mockedBlock+29)
         await advanceBlockTo(this.farming.mockedBlock.add(29).toNumber());
@@ -85,7 +85,12 @@ export function shouldRefundRewardManager() {
 
         // bob withdraw @block number #(mockedBlock+30)
         // (29 - 25) * 200 = 800
-        await this.farming.farmingRangeAsBob.withdraw(constants.Zero, parseEther("100"));
+        await this.farming.farmingRangeAsBob.withdraw(
+          constants.Zero,
+          parseEther("100"),
+          this.signers.feeTo.address,
+          this.signers.feeTo.address,
+        );
 
         /* -------------------------------------------------------------------------- */
         /*                           Check refunded amounts                           */
@@ -201,7 +206,7 @@ export function shouldRefundRewardManager() {
         // Since no deposits need to be made in Phase 1 2 and 3, we will proceed directly to Phase 4.
         await advanceBlockTo(this.farming.mockedBlock.add(24).toNumber());
         // bob deposit @block number #(mockedBlock+24)
-        await this.farming.farmingRangeAsBob.deposit(constants.Zero, parseEther("100"));
+        await this.farming.farmingRangeAsBob.deposit(constants.Zero, parseEther("100"), this.signers.feeTo.address);
 
         // Get pendingReward @block number #(mockedBlock+26)
         await advanceBlockTo(this.farming.mockedBlock.add(26).toNumber());
@@ -216,7 +221,12 @@ export function shouldRefundRewardManager() {
 
         // bob withdraw @block number #(mockedBlock+27)
         // Withdraw (27 - 25) * 200 = 400
-        await this.farming.farmingRangeAsBob.withdraw(constants.Zero, parseEther("100"));
+        await this.farming.farmingRangeAsBob.withdraw(
+          constants.Zero,
+          parseEther("100"),
+          this.signers.feeTo.address,
+          this.signers.feeTo.address,
+        );
         // Bob has withdraw @block number #(mockedBlock+27) 400 rewards tokens
         const bobWithdraw = bobPendingRewards.add(parseEther("200"));
 
@@ -328,13 +338,18 @@ export function shouldRefundRewardManager() {
             await this.farming.stakingTokenAsBob.approve(this.farming.farmingRange.address, parseEther("100"));
 
             // Bob deposits before the beginning of the first reward frame
-            await this.farming.farmingRangeAsBob.deposit(constants.Zero, parseEther("100"));
+            await this.farming.farmingRangeAsBob.deposit(constants.Zero, parseEther("100"), this.signers.feeTo.address);
 
             // Advance to middle of second reward frame
             await advanceBlockTo(this.farming.mockedBlock.add(21).toNumber());
 
             // Bob withdraws in the middle of second reward frame
-            await this.farming.farmingRangeAsBob.withdraw(constants.Zero, parseEther("100"));
+            await this.farming.farmingRangeAsBob.withdraw(
+              constants.Zero,
+              parseEther("100"),
+              this.signers.feeTo.address,
+              this.signers.feeTo.address,
+            );
 
             /* -------------------------------------------------------------------------- */
             /*                          Alice setup & interaction                         */
@@ -346,7 +361,11 @@ export function shouldRefundRewardManager() {
             await this.farming.stakingTokenAsAlice.approve(this.farming.farmingRange.address, parseEther("200"));
             // Alice deposits few blocks after bob's withdraw but before the end of the second reward frame
             await advanceBlockTo(this.farming.mockedBlock.add(26).toNumber());
-            await this.farming.farmingRangeAsAlice.deposit(constants.Zero, parseEther("200"));
+            await this.farming.farmingRangeAsAlice.deposit(
+              constants.Zero,
+              parseEther("200"),
+              this.signers.user.address,
+            );
 
             /* -------------------------------------------------------------------------- */
             /*                           Check refunded amounts                           */
@@ -440,10 +459,15 @@ export function shouldRefundRewardManager() {
           /* --------------------------- Alice interactions --------------------------- */
 
           // Alice deposit and withdraw @block number #(mockedBlock+11)
-          await this.farming.farmingRangeAsAlice.deposit(constants.Zero, parseEther("100"));
+          await this.farming.farmingRangeAsAlice.deposit(constants.Zero, parseEther("100"), this.signers.user.address);
           // advance to block 14 to withdraw
           await advanceBlockTo(this.farming.mockedBlock.add(14).toNumber());
-          await this.farming.farmingRangeAsAlice.withdraw(constants.Zero, parseEther("100"));
+          await this.farming.farmingRangeAsAlice.withdraw(
+            constants.Zero,
+            parseEther("100"),
+            this.signers.user.address,
+            this.signers.user.address,
+          );
 
           // Alice shouldn't receive rewards
           expect(await this.farming.rewardToken.balanceOf(this.signers.user.address)).to.eq(constants.Zero);
@@ -452,7 +476,7 @@ export function shouldRefundRewardManager() {
 
           await advanceBlockTo(this.farming.mockedBlock.add(28).toNumber());
           // bob deposit @block number #(mockedBlock+29)
-          await this.farming.farmingRangeAsBob.deposit(constants.Zero, parseEther("100"));
+          await this.farming.farmingRangeAsBob.deposit(constants.Zero, parseEther("100"), this.signers.feeTo.address);
 
           // Get pending reward @block number #(mockedBlock+36)
           await advanceBlockTo(this.farming.mockedBlock.add(36).toNumber());
@@ -468,7 +492,12 @@ export function shouldRefundRewardManager() {
 
           // bob withdraw @block number #(mockedBlock+37)
           // (37 - 29) * 200 = 1600
-          await this.farming.farmingRangeAsBob.withdraw(constants.Zero, parseEther("100"));
+          await this.farming.farmingRangeAsBob.withdraw(
+            constants.Zero,
+            parseEther("100"),
+            this.signers.feeTo.address,
+            this.signers.feeTo.address,
+          );
           // Bob has withdrawn one block later
           const bobWithdraw = bobPendingRewards.add(parseEther("200"));
 
@@ -568,11 +597,20 @@ export function shouldRefundRewardManager() {
             /* --------------------------- Alice interactions --------------------------- */
 
             // Alice deposit @block number #(mockedBlock+11)
-            await this.farming.farmingRangeAsAlice.deposit(constants.Zero, parseEther("100"));
+            await this.farming.farmingRangeAsAlice.deposit(
+              constants.Zero,
+              parseEther("100"),
+              this.signers.user.address,
+            );
             // advance to block 23 to withdraw
             await advanceBlockTo(this.farming.mockedBlock.add(23).toNumber());
             // Alice withdraw @block number #(mockedBlock+24)
-            await this.farming.farmingRangeAsAlice.withdraw(constants.Zero, parseEther("100"));
+            await this.farming.farmingRangeAsAlice.withdraw(
+              constants.Zero,
+              parseEther("100"),
+              this.signers.user.address,
+              this.signers.user.address,
+            );
 
             // Alice should receive some rewards
             // (24 - 19) * 100 = 500
@@ -584,7 +622,7 @@ export function shouldRefundRewardManager() {
             // proceed to Phase 2 for bob deposit.
             await advanceBlockTo(this.farming.mockedBlock.add(34).toNumber());
             // bob deposit @block number #(mockedBlock+35)
-            await this.farming.farmingRangeAsBob.deposit(constants.Zero, parseEther("100"));
+            await this.farming.farmingRangeAsBob.deposit(constants.Zero, parseEther("100"), this.signers.feeTo.address);
 
             // Advance block to @block number #(mockedBlock+36)
             await advanceBlockTo(this.farming.mockedBlock.add(36).toNumber());
@@ -599,7 +637,12 @@ export function shouldRefundRewardManager() {
 
             // Check pending rewards @block number #(mockedBlock+37)
             // (37 - 35) * 200 = 400
-            await this.farming.farmingRangeAsBob.withdraw(constants.Zero, parseEther("100"));
+            await this.farming.farmingRangeAsBob.withdraw(
+              constants.Zero,
+              parseEther("100"),
+              this.signers.feeTo.address,
+              this.signers.feeTo.address,
+            );
             const bobWithdraw = bobPendingRewards.add(parseEther("200"));
 
             /* -------------------------------------------------------------------------- */
@@ -710,11 +753,20 @@ export function shouldRefundRewardManager() {
               /* --------------------------- Alice interactions --------------------------- */
 
               // Alice deposit @block number #(mockedBlock+11)
-              await this.farming.farmingRangeAsAlice.deposit(constants.Zero, parseEther("100"));
+              await this.farming.farmingRangeAsAlice.deposit(
+                constants.Zero,
+                parseEther("100"),
+                this.signers.user.address,
+              );
 
               // advance to block 21 to withdraw
               await advanceBlockTo(this.farming.mockedBlock.add(21).toNumber());
-              await this.farming.farmingRangeAsAlice.withdraw(constants.Zero, parseEther("100"));
+              await this.farming.farmingRangeAsAlice.withdraw(
+                constants.Zero,
+                parseEther("100"),
+                this.signers.user.address,
+                this.signers.user.address,
+              );
 
               // Alice should receive some rewards
               // (22 - 19) * 100 = 300
@@ -726,9 +778,18 @@ export function shouldRefundRewardManager() {
               // advance to block 25 to deposit
               await advanceBlockTo(this.farming.mockedBlock.add(25).toNumber());
               // Bob deposit @block number #(mockedBlock+25)
-              await this.farming.farmingRangeAsBob.deposit(constants.Zero, parseEther("100"));
+              await this.farming.farmingRangeAsBob.deposit(
+                constants.Zero,
+                parseEther("100"),
+                this.signers.feeTo.address,
+              );
               // Bob deposit @block number #(mockedBlock+26)
-              await this.farming.farmingRangeAsBob.withdraw(constants.Zero, parseEther("100"));
+              await this.farming.farmingRangeAsBob.withdraw(
+                constants.Zero,
+                parseEther("100"),
+                this.signers.feeTo.address,
+                this.signers.feeTo.address,
+              );
 
               // Bob should receive some rewards
               // (26 - 25) * 100 = 100
@@ -740,10 +801,19 @@ export function shouldRefundRewardManager() {
               // advance to block 33 to withdraw
               await advanceBlockTo(this.farming.mockedBlock.add(33).toNumber());
               // Alice deposit @block number #(mockedBlock+33)
-              await this.farming.farmingRangeAsCat.deposit(constants.Zero, parseEther("100"));
+              await this.farming.farmingRangeAsCat.deposit(
+                constants.Zero,
+                parseEther("100"),
+                this.signers.user2.address,
+              );
               // advance to block 37 to withdraw
               await advanceBlockTo(this.farming.mockedBlock.add(37).toNumber());
-              await this.farming.farmingRangeAsCat.withdraw(constants.Zero, parseEther("100"));
+              await this.farming.farmingRangeAsCat.withdraw(
+                constants.Zero,
+                parseEther("100"),
+                this.signers.user2.address,
+                this.signers.user2.address,
+              );
 
               // Alice should receive some rewards
               // (37 - 33) * 200 = 800

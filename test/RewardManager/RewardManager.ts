@@ -12,6 +12,7 @@ export function unitTestsRewardManager(): void {
     describe("Reward Manager L1", function () {
       beforeEach(async function () {
         const farmingData = await loadFixture(unitFixtureRewardManagerTestL1);
+
         this.contracts.smardexToken = farmingData.stakingToken;
         this.contracts.tether = farmingData.tether;
         this.contracts.rewardManagerTest = farmingData.rewardManagerTest;
@@ -25,6 +26,7 @@ export function unitTestsRewardManager(): void {
     describe("Reward Manager L2", function () {
       beforeEach(async function () {
         const farmingData = await loadFixture(unitFixtureRewardManagerTestL2);
+
         this.contracts.smardexToken = farmingData.stakingToken;
         this.contracts.tether = farmingData.tether;
         this.contracts.rewardManagerTest = farmingData.rewardManagerTest;
@@ -37,6 +39,7 @@ export function unitTestsRewardManager(): void {
     describe("Reward Manager L2 Arbitrum", function () {
       beforeEach(async function () {
         const farmingData = await loadFixture(unitFixtureRewardManagerTestL2Arbitrum);
+
         this.contracts.smardexToken = farmingData.stakingToken;
         this.contracts.tether = farmingData.tether;
         this.contracts.rewardManagerTest = farmingData.rewardManagerTest;

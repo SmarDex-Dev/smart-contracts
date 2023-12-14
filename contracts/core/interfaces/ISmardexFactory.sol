@@ -12,6 +12,15 @@ interface ISmardexFactory {
     event PairCreated(address indexed token0, address indexed token1, address pair, uint256 totalPair);
 
     /**
+     * @notice emitted at each SmardexPair manually added
+     * @param token0 address of the token0
+     * @param token1 address of the token1
+     * @param pair address of the SmardexPair created
+     * @param totalPair number of SmardexPair created so far
+     */
+    event PairAdded(address indexed token0, address indexed token1, address pair, uint256 totalPair);
+
+    /**
      * @notice emitted each time feesLP and feesPool are changed
      * @param feesLP new feesLP
      * @param feesPool new feesPool
@@ -56,6 +65,12 @@ interface ISmardexFactory {
     function getDefaultFees() external view returns (uint128 feesLP_, uint128 feesPool_);
 
     /**
+     * @notice whether whitelist is open
+     * @return open_ true if the whitelist is open, false otherwise
+     */
+    function whitelistOpen() external view returns (bool open_);
+
+    /**
      * @notice create pair with 2 address
      * @param _tokenA address of tokenA
      * @param _tokenB address of tokenB
@@ -76,4 +91,16 @@ interface ISmardexFactory {
      * @param _feesPool new numerator of fees sent to Pool, could be = 0
      */
     function setFees(uint128 _feesLP, uint128 _feesPool) external;
+
+    /**
+     * @notice disable whitelist (onlyOwner)
+     * whitelist cannot be re-opened after that.
+     */
+    function closeWhitelist() external;
+
+    /**
+     * @notice add a pair manually
+     * @param _pair pair address to add (must be an ISmardexPair)
+     */
+    function addPair(address _pair) external;
 }

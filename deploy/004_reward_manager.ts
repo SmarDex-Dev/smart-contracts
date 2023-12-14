@@ -1,6 +1,7 @@
 import { DeployFunction } from "hardhat-deploy/types";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
-import { artifacts, Networks } from "./utils";
+import { artifacts, Networks, abiPaths } from "./utils";
+import { startBlockStaking } from "./params";
 
 let rewardManagerArtifact: string = "RewardManager";
 
@@ -12,8 +13,6 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const sdex = await deployments.get("SmardexToken");
 
-  // SPECIFY THIS PARAMETER BEFORE DEPLOYING !!
-  const startBlockStaking: number = 0; // 0 will revert if the staking is to be deployed
   const args: string[] = [admin];
   let farmingRangeArtifact: string = "FarmingRange";
   let staking: boolean = true;
@@ -28,34 +27,33 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   if (staking) {
     args.push(sdex.address);
-    args.push(startBlockStaking.toString());
+    args.push(startBlockStaking().toString());
   }
 
   const rewardManager = await deploy(rewardManagerArtifact, {
     from: admin,
     args,
     log: true,
+    waitConfirmations: 2,
   });
 
   const rewardManagerContract = await getContractAt(rewardManagerArtifact, rewardManager.address);
 
   if (staking) {
     const stakingAddress = await rewardManagerContract.staking();
-    const stakingArtifact = await deployments.getArtifact("Staking");
 
     await save("Staking", {
       address: stakingAddress,
-      abi: stakingArtifact.abi,
+      abi: (await import(abiPaths["Staking" as keyof typeof abiPaths])).abi,
     });
   }
 
   const farmingAddress = await rewardManagerContract.farming();
-  const farmingArtifact = await deployments.getArtifact(farmingRangeArtifact);
 
   await save(farmingRangeArtifact, {
     address: farmingAddress,
-    abi: farmingArtifact.abi,
+    abi: (await import(abiPaths[farmingRangeArtifact as keyof typeof abiPaths])).abi,
   });
 };
 export default func;
-func.tags = [rewardManagerArtifact];
+func.tags = ["RewardManager"];

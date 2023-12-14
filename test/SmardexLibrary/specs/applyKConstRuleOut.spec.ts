@@ -1,6 +1,7 @@
 import { parseEther } from "ethers/lib/utils";
 import { expect } from "chai";
 import { FEES_BASE, FEES_LP, FEES_TOTAL_REVERSED, FEES_POOL } from "../../constants";
+import { SmardexLibraryTest } from "../../../typechain";
 
 export function shouldBehaveLikeApplyKConstRuleOut(): void {
   it("with logic", async function () {
@@ -18,7 +19,7 @@ export function shouldBehaveLikeApplyKConstRuleOut(): void {
 
     const amountInWithFeeLp = FEES_LP.mul(amountIn).add(amountInWithFee).div(FEES_BASE);
 
-    const result = await this.contracts.smardexLibraryTest.applyKConstRuleOut(
+    const result = await (this.contracts.smardexLibraryTest as SmardexLibraryTest).applyKConstRuleOut(
       amountIn,
       reserveIn,
       reserveOut,

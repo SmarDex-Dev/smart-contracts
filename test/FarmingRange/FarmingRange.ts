@@ -16,60 +16,75 @@ import { shouldBehaveLikeWithdraw } from "./specs/withdraw.spec";
 import { shouldBehaveLikeFarmingConstructor } from "./specs/farmingConstructor.spec";
 import { shouldBehaveLikeUpdateCampaign } from "./specs/updateCampaign.spec";
 import { shouldRefundRewardManager } from "./specs/rewardManagerRefund.spec";
-import { shouldBehaveLikeFarmingRangeConstructorL2Arbitrum } from "./specs/farmingConstructorL2Arbitrum.spec";
+import { shouldRevertAtMaxRewardLimit } from "./specs/maxRewardInfoLimit.spec";
+import { shouldRevertAtMaxRewardLimitArbitrum } from "./specs/maxRewardInfoLimitArbitrum.spec";
+import { shouldBehaveLikeRemoveLastRewardInfoMultiple } from "./specs/removeLastRewardInfoMultiple.spec";
 
 export function unitTestsFarmingRange(): void {
   describe("FarmingRange", function () {
     describe("FarmingRange L1", function () {
       beforeEach(async function () {
         const fixture = await loadFixture(unitFixtureFarmingRange);
+
         this.farming = {
           ...this.farming,
           ...fixture,
         };
       });
 
-      shouldBehaveLikeFarmingConstructor();
-      shouldBehaveLikeAddCampaignInfo();
-      shouldBehaveLikeAddRewardInfo();
-      shouldBehaveLikeCurrentEndBlock();
-      shouldBehaveLikeCurrentRewardPerBlock();
-      shouldBehaveLikeDeposit();
-      shouldBehaveLikeDepositWithPermit();
-      shouldBehaveLikeEmergencyWithdraw();
-      shouldBehaveLikeHarvest();
-      shouldBehaveLikeRemoveLastRewardInfo();
-      shouldBehaveLikeUpdateCampaign();
-      shouldBehaveLikeUpdateRewardInfo();
-      shouldBehaveLikeUpdateRewardMultiple();
-      shouldBehaveLikeWithdraw();
-      shouldRefundRewardManager();
+      farmingRangeTests();
+      shouldRevertAtMaxRewardLimit();
     });
 
     describe("FarmingRange L2 Arbitrum", function () {
       beforeEach(async function () {
         const fixture = await loadFixture(unitFixtureFarmingRangeL2Arbitrum);
+
         this.farming = {
           ...this.farming,
           ...fixture,
         };
       });
 
-      shouldBehaveLikeFarmingRangeConstructorL2Arbitrum();
-      shouldBehaveLikeAddCampaignInfo();
-      shouldBehaveLikeAddRewardInfo();
-      shouldBehaveLikeCurrentEndBlock();
-      shouldBehaveLikeCurrentRewardPerBlock();
-      shouldBehaveLikeDeposit();
-      shouldBehaveLikeDepositWithPermit();
-      shouldBehaveLikeEmergencyWithdraw();
-      shouldBehaveLikeHarvest();
-      shouldBehaveLikeRemoveLastRewardInfo();
-      shouldBehaveLikeUpdateCampaign();
-      shouldBehaveLikeUpdateRewardInfo();
-      shouldBehaveLikeUpdateRewardMultiple();
-      shouldBehaveLikeWithdraw();
-      shouldRefundRewardManager();
+      farmingRangeTests();
+      shouldRevertAtMaxRewardLimitArbitrum();
     });
   });
+
+  describe("Farming ethereum update", function () {
+    beforeEach(async function () {
+      const { factory, smardexPairTest, token0, token1, smardexRouterTest, WETH } = await loadFixture(
+        unitFixtureSmardexPairTest,
+      );
+
+      this.contracts.smardexFactoryTest = factory;
+      this.contracts.smardexPairTest = smardexPairTest;
+      this.contracts.token0 = token0;
+      this.contracts.token1 = token1;
+      this.contracts.routerForPairTest = smardexRouterTest;
+      this.contracts.WETH = WETH;
+
+      await this.contracts.token0.approve(this.contracts.routerForPairTest.address, constants.MaxUint256);
+      await this.contracts.token1.approve(this.contracts.routerForPairTest.address, constants.MaxUint256);
+    });
+  });
+}
+
+function farmingRangeTests(): void {
+  shouldBehaveLikeFarmingConstructor();
+  shouldBehaveLikeAddCampaignInfo();
+  shouldBehaveLikeAddRewardInfo();
+  shouldBehaveLikeCurrentEndBlock();
+  shouldBehaveLikeCurrentRewardPerBlock();
+  shouldBehaveLikeDeposit();
+  shouldBehaveLikeDepositWithPermit();
+  shouldBehaveLikeEmergencyWithdraw();
+  shouldBehaveLikeHarvest();
+  shouldBehaveLikeRemoveLastRewardInfo();
+  shouldBehaveLikeRemoveLastRewardInfoMultiple();
+  shouldBehaveLikeUpdateCampaign();
+  shouldBehaveLikeUpdateRewardInfo();
+  shouldBehaveLikeUpdateRewardMultiple();
+  shouldBehaveLikeWithdraw();
+  shouldRefundRewardManager();
 }

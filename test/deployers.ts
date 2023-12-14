@@ -1,14 +1,17 @@
-import { BigNumber, Signer } from "ethers";
+import { BigNumber, Signer, constants } from "ethers";
 import { ethers, network } from "hardhat";
+
 import {
   ArbSysCoreTest,
   AutoSwapper,
   AutoSwapperL2,
   CallbackTest,
+  CallbackTestV2,
   CheckBlockTest,
   DoubleSwapRouter,
   ERC20Test,
   FakeERC20reentrancy,
+  FakeERC20reentrancyV2,
   FarmingRange,
   FarmingRangeL2Arbitrum,
   RewardManagerTest,
@@ -16,21 +19,32 @@ import {
   RewardManagerTestL2Arbitrum,
   RouterEventEmitter,
   RouterForPairTest,
+  RouterForPairTestV2,
   SmardexFactory,
+  SmardexFactoryV1,
   SmardexFactoryTest,
+  SmardexFactoryTestV1,
   SmardexLibraryTest,
+  SmardexLibraryTestV1,
   SmardexPair,
+  SmardexPairV1,
   SmardexPairTest,
+  SmardexPairTestV1,
   SmardexRouter,
+  SmardexRouterV2,
   SmardexRouterTest,
+  SmardexRouterTestV2,
   SmardexTokenTest,
   Staking,
   TetherToken,
   WETH9,
+  SmardexPairV1__factory,
+  ERC20Fluid,
 } from "../typechain";
-import { parseEther } from "ethers/lib/utils";
 
+import { parseEther } from "ethers/lib/utils";
 import { ADDRESS_100, FEES_LP, FEES_POOL } from "./constants";
+import { createPair } from "./SmardexFactory/utils";
 
 export async function deployOrderedPairOfERC20(totalSupply: BigNumber): Promise<[ERC20Test, ERC20Test]> {
   const token0 = await deployERC20Test(totalSupply);
@@ -60,11 +74,28 @@ export async function deploySmardexFactory(): Promise<SmardexFactory> {
   return smardexFactory;
 }
 
+export async function deploySmardexFactoryV1(): Promise<SmardexFactoryV1> {
+  const [admin] = await ethers.getSigners();
+  const contractFactory = await ethers.getContractFactory("SmardexFactoryV1");
+  const smardexFactory = await contractFactory.deploy(admin.address);
+  await smardexFactory.deployed();
+  return smardexFactory;
+}
+
 export async function deploySmardexFactoryTest(): Promise<SmardexFactoryTest> {
   const contractFactoryTest = await ethers.getContractFactory("SmardexFactoryTest", {});
   const smardexFactoryTest = await contractFactoryTest.deploy();
   await smardexFactoryTest.deployed();
   await smardexFactoryTest.setFees(FEES_LP, FEES_POOL);
+
+  return smardexFactoryTest;
+}
+
+export async function deploySmardexFactoryTestV1(): Promise<SmardexFactoryTestV1> {
+  const [admin] = await ethers.getSigners();
+  const contractFactoryTest = await ethers.getContractFactory("SmardexFactoryTestV1", {});
+  const smardexFactoryTest = await contractFactoryTest.deploy(admin.address);
+  await smardexFactoryTest.deployed();
 
   return smardexFactoryTest;
 }
@@ -77,8 +108,16 @@ export async function deploySmardexLibraryTest(): Promise<SmardexLibraryTest> {
   return smardexLibraryTest;
 }
 
+export async function deploySmardexLibraryTestV1(): Promise<SmardexLibraryTestV1> {
+  const contractSmardexLibrary = await ethers.getContractFactory("SmardexLibraryTestV1", {});
+  const smardexLibraryTest = await contractSmardexLibrary.deploy();
+  await smardexLibraryTest.deployed();
+
+  return smardexLibraryTest;
+}
+
 export async function deploySmardexPair(
-  smardexFactory: SmardexFactory,
+  smardexFactory: SmardexFactory | SmardexFactoryV1,
   token0: ERC20Test | WETH9,
   token1: ERC20Test | WETH9,
 ): Promise<SmardexPair> {
@@ -88,14 +127,37 @@ export async function deploySmardexPair(
   return contractPair.attach(smardexPairAddress);
 }
 
+export async function deploySmardexPairV1(
+  smardexFactory: SmardexFactory | SmardexFactoryV1,
+  token0: ERC20Test | WETH9,
+  token1: ERC20Test | WETH9,
+): Promise<SmardexPairV1> {
+  await smardexFactory.createPair(token0.address, token1.address);
+  const smardexPairAddress = await smardexFactory.getPair(token0.address, token1.address);
+  const contractPair = await ethers.getContractFactory("SmardexPairV1", {});
+  return contractPair.attach(smardexPairAddress);
+}
+
 export async function deploySmardexPairTest(
-  smardexFactoryTest: SmardexFactoryTest,
+  smardexFactoryTest: SmardexFactoryTest | SmardexFactoryTestV1,
   token0: ERC20Test | WETH9,
   token1: ERC20Test | WETH9,
 ): Promise<SmardexPairTest> {
   await smardexFactoryTest.createPairTest(token0.address, token1.address);
   const smardexPairTestAddress = await smardexFactoryTest.getPair(token0.address, token1.address);
   const contractPairTest = await ethers.getContractFactory("SmardexPairTest", {});
+
+  return contractPairTest.attach(smardexPairTestAddress);
+}
+
+export async function deploySmardexPairTestV1(
+  smardexFactoryTest: SmardexFactoryTest | SmardexFactoryTestV1,
+  token0: ERC20Test | WETH9,
+  token1: ERC20Test | WETH9,
+): Promise<SmardexPairTestV1> {
+  await smardexFactoryTest.createPairTest(token0.address, token1.address);
+  const smardexPairTestAddress = await smardexFactoryTest.getPair(token0.address, token1.address);
+  const contractPairTest = await ethers.getContractFactory("SmardexPairTestV1", {});
 
   return contractPairTest.attach(smardexPairTestAddress);
 }
@@ -108,7 +170,10 @@ export async function deployWETH9(): Promise<WETH9> {
   return weth;
 }
 
-export async function deploySmardexRouterTest(smardexFactory: SmardexFactory, weth: WETH9): Promise<SmardexRouterTest> {
+export async function deploySmardexRouterTest(
+  smardexFactory: SmardexFactory | SmardexFactoryTest | SmardexFactoryV1 | SmardexFactoryTestV1,
+  weth: WETH9,
+): Promise<SmardexRouterTest> {
   const contractRouterTest = await ethers.getContractFactory("SmardexRouterTest", {});
   const routerTest = await contractRouterTest.deploy(smardexFactory.address, weth.address);
   await routerTest.deployed();
@@ -116,12 +181,53 @@ export async function deploySmardexRouterTest(smardexFactory: SmardexFactory, we
   return routerTest;
 }
 
-export async function deploySmardexRouter(smardexFactory: SmardexFactory, weth: WETH9): Promise<SmardexRouter> {
+export async function deploySmardexRouterTestV2(
+  smardexFactory: SmardexFactory | SmardexFactoryTest | SmardexFactoryV1 | SmardexFactoryTestV1,
+  weth: WETH9,
+): Promise<SmardexRouterTestV2> {
+  const contractRouterTest = await ethers.getContractFactory("SmardexRouterTestV2", {});
+  const routerTest = await contractRouterTest.deploy(smardexFactory.address, weth.address);
+  await routerTest.deployed();
+
+  return routerTest;
+}
+
+export async function deploySmardexRouter(
+  smardexFactory: SmardexFactory | SmardexFactoryV1,
+  weth: WETH9,
+): Promise<SmardexRouter> {
   const contractSmardexRouter = await ethers.getContractFactory("SmardexRouter", {});
   const smardexRouter = await contractSmardexRouter.deploy(smardexFactory.address, weth.address);
   await smardexRouter.deployed();
 
   return smardexRouter;
+}
+
+export async function deploySmardexRouterV2WithV1Factory(
+  smardexFactory: SmardexFactory | SmardexFactoryV1,
+  weth: WETH9,
+): Promise<SmardexRouterV2> {
+  const contractSmardexRouter = await ethers.getContractFactory("SmardexRouterV2", {});
+  const smardexRouter = await contractSmardexRouter.deploy(smardexFactory.address, weth.address);
+  await smardexRouter.deployed();
+
+  return smardexRouter;
+}
+
+export async function deployV1Pair(
+  token0: ERC20Test,
+  token1: ERC20Test,
+  smardexFactoryV1: SmardexFactoryV1,
+  smardexRouterV2: SmardexRouterV2,
+) {
+  await token0.approve(smardexRouterV2.address, constants.MaxUint256);
+  await token1.approve(smardexRouterV2.address, constants.MaxUint256);
+  const bytecodeV1: string = SmardexPairV1__factory.bytecode;
+  // create old pair to migrate
+  await createPair([token0.address, token1.address], smardexFactoryV1, bytecodeV1);
+  const pairV1 = await smardexFactoryV1.getPair(token0.address, token1.address);
+  const pair = SmardexPairV1__factory.connect(pairV1, (await ethers.getSigners())[0]);
+  return pair;
 }
 
 export async function deployRouterEventEmitter(): Promise<RouterEventEmitter> {
@@ -176,17 +282,27 @@ export async function deployAutoSwapperL1(
   factoryAddress: string,
   sdexTokenAddress: string,
   stakingContractAddress: string,
+  routerContractAddress: string,
 ): Promise<AutoSwapper> {
   const factory = await ethers.getContractFactory("AutoSwapper");
-  const autoSwapper = await factory.deploy(factoryAddress, sdexTokenAddress, stakingContractAddress);
-  await autoSwapper.deployed();
+  const autoSwapper = await factory.deploy(
+    factoryAddress,
+    sdexTokenAddress,
+    stakingContractAddress,
+    routerContractAddress,
+  );
 
+  await autoSwapper.deployed();
   return autoSwapper;
 }
 
-export async function deployAutoSwapperL2(factoryAddress: string, sdexTokenAddress: string): Promise<AutoSwapperL2> {
+export async function deployAutoSwapperL2(
+  factoryAddress: string,
+  sdexTokenAddress: string,
+  routerContractAddress: string,
+): Promise<AutoSwapperL2> {
   const factory = await ethers.getContractFactory("AutoSwapperL2");
-  const autoSwapper = await factory.deploy(factoryAddress, sdexTokenAddress);
+  const autoSwapper = await factory.deploy(factoryAddress, sdexTokenAddress, routerContractAddress);
   await autoSwapper.deployed();
 
   return autoSwapper;
@@ -231,15 +347,34 @@ export async function deployDoubleSwapRouter(): Promise<DoubleSwapRouter> {
   return doubleSwapRouter;
 }
 
-export async function deployCallbackTestRouter(smardexFactory: SmardexFactory, WETH: WETH9): Promise<CallbackTest> {
-  const factory = await ethers.getContractFactory("CallbackTest");
+export async function deployCallbackTestRouterV2(
+  smardexFactory: SmardexFactory | SmardexFactoryV1,
+  WETH: WETH9,
+): Promise<CallbackTestV2> {
+  const factory = await ethers.getContractFactory("CallbackTestV2");
+
   const mintCallbackTestRouter = await factory.deploy(smardexFactory.address, WETH.address);
   await mintCallbackTestRouter.deployed();
 
   return mintCallbackTestRouter;
 }
 
-export async function deployRouterForPairTest(smardexFactory: SmardexFactory, WETH: WETH9): Promise<RouterForPairTest> {
+export async function deployCallbackTestRouter(
+  smardexFactory: SmardexFactory | SmardexFactoryV1,
+  WETH: WETH9,
+): Promise<CallbackTest> {
+  const factory = await ethers.getContractFactory("CallbackTest");
+
+  const mintCallbackTestRouter = await factory.deploy(smardexFactory.address, WETH.address);
+  await mintCallbackTestRouter.deployed();
+
+  return mintCallbackTestRouter;
+}
+
+export async function deployRouterForPairTest(
+  smardexFactory: SmardexFactory | SmardexFactoryV1,
+  WETH: WETH9,
+): Promise<RouterForPairTest> {
   const factory = await ethers.getContractFactory("RouterForPairTest");
   const routerForPairTest = await factory.deploy(smardexFactory.address, WETH.address);
   await routerForPairTest.deployed();
@@ -247,11 +382,33 @@ export async function deployRouterForPairTest(smardexFactory: SmardexFactory, WE
   return routerForPairTest;
 }
 
+export async function deployRouterForPairTestV2(
+  smardexFactory: SmardexFactory | SmardexFactoryV1,
+  WETH: WETH9,
+): Promise<RouterForPairTestV2> {
+  const factory = await ethers.getContractFactory("RouterForPairTestV2");
+  const routerForPairTest = await factory.deploy(smardexFactory.address, WETH.address);
+  await routerForPairTest.deployed();
+
+  return routerForPairTest;
+}
+
 export async function deployFakeERC20reentrancy(
-  smardexFactory: SmardexFactory,
+  smardexFactory: SmardexFactory | SmardexFactoryV1,
   WETH: WETH9,
 ): Promise<FakeERC20reentrancy> {
   const factory = await ethers.getContractFactory("FakeERC20reentrancy");
+  const fakeERC20contract = await factory.deploy(smardexFactory.address, WETH.address);
+  await fakeERC20contract.deployed();
+
+  return fakeERC20contract;
+}
+
+export async function deployFakeERC20reentrancyV2(
+  smardexFactory: SmardexFactory | SmardexFactoryV1,
+  WETH: WETH9,
+): Promise<FakeERC20reentrancyV2> {
+  const factory = await ethers.getContractFactory("FakeERC20reentrancyV2");
   const fakeERC20contract = await factory.deploy(smardexFactory.address, WETH.address);
   await fakeERC20contract.deployed();
 
@@ -283,4 +440,34 @@ export async function deployStaking(smardexTokenAddress: string, farmingAddress:
   await Staking.deployed();
 
   return Staking;
+}
+
+export async function deployERC20Fluid(total_supply: BigNumber): Promise<ERC20Fluid> {
+  const contractErc20 = await ethers.getContractFactory("ERC20Fluid", {});
+  const erc20 = await contractErc20.deploy(total_supply);
+  await erc20.deployed();
+
+  return erc20;
+}
+
+export async function deployOrderedPairFluid(totalSupply: BigNumber): Promise<[ERC20Fluid, ERC20Fluid]> {
+  const token0 = await deployERC20Fluid(totalSupply);
+  const token1 = await deployERC20Fluid(totalSupply);
+
+  if (BigNumber.from(token0.address).gt(BigNumber.from(token1.address))) {
+    return [token1, token0];
+  } else {
+    return [token0, token1];
+  }
+}
+
+export async function deploySmardexPairFluid(
+  smardexFactory: SmardexFactoryTest,
+  token0: ERC20Fluid,
+  token1: ERC20Fluid,
+): Promise<SmardexPairTest> {
+  await smardexFactory.createPairTest(token0.address, token1.address);
+  const smardexPairAddress = await smardexFactory.getPair(token0.address, token1.address);
+  const contractPair = await ethers.getContractFactory("SmardexPairTest", {});
+  return contractPair.attach(smardexPairAddress);
 }
