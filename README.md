@@ -1,11 +1,15 @@
 # SmarDex Contracts
 
-[![Tests](https://github.com/petra-foundation/SmarDex-contracts/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/petra-foundation/SmarDex-contracts/actions/workflows/ci.yml)
+[![Tests](https://github.com/SmarDex-Dev/smart-contracts/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/petra-foundation/SmarDex-contracts/actions/workflows/ci.yml)
 
 ## Description
 
 Uniswap-like dex protocol that allow a better incentivization for liquidity providers.
 This repo includes an SDEX pool (rewards comes from the dex) and farming capabilities (rewards requires external income source).
+
+## Website
+
+https://smardex.io
 
 ## Documentation
 

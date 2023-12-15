@@ -6,13 +6,13 @@
   "keywords": [
     "SmarDex"
   ],
-  "homepage": "https://github.com/petra-foundation/SmarDex-contracts#readme",
+  "homepage": "https://github.com/SmarDex-Dev/smart-contracts#readme",
   "bugs": {
-    "url": "https://github.com/petra-foundation/SmarDex-contracts/issues"
+    "url": "https://github.com/SmarDex-Dev/smart-contracts/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/petra-foundation/SmarDex-contracts.git"
+    "url": "git+https://github.com/SmarDex-Dev/smart-contracts.git"
   },
   "license": "BUSL-1.1",
   "author": "",
