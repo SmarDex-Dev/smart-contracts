@@ -1,6 +1,6 @@
 # SmarDex Contracts
 
-[![Tests](https://github.com/SmarDex-Dev/smart-contracts/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/SmarDex-Dev/smart-contracts/actions/workflows/ci.yml)
+[![Tests](https://github.com/SmarDex-Dev/smart-contracts/actions/workflows/ci.yml/badge.svg)](https://github.com/SmarDex-Dev/smart-contracts/actions/workflows/ci.yml)
 
 ## Description
 
