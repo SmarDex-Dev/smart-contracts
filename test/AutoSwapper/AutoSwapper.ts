@@ -14,6 +14,7 @@ export function unitTestsAutoSwapper(): void {
           smardexFactory: fixture.factory,
           smardexPair: fixture.pair,
         };
+
         this.misc.targetAddress = this.contracts.smardexFactory.address;
       });
 
@@ -29,6 +30,7 @@ export function unitTestsAutoSwapper(): void {
           smardexFactory: fixture.factory,
           smardexPair: fixture.pair,
         };
+
         this.misc.targetAddress = ADDRESS_DEAD;
       });
 

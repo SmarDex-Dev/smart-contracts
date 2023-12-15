@@ -5,13 +5,15 @@ import {
   unitFixtureSmardexPairTest,
   unitFixtureSmardexRouter,
   unitFixtureSmardexRouterTest,
+  unitFixtureSmardexRouterWhitelist,
 } from "../fixtures";
 import { shouldBehaveLikeSmardexRouterQuote } from "./specs/quote.spec";
-import { testExploit, testHack, testHack4, testNewSmardex } from "./specs/BestTrade.spec";
+import { testExploit, testHack, testHack4, testNewSmardex, testLiqFrontrun } from "./specs/BestTrade.spec";
 import { shouldBehaveLikeSmardexRouterPairFor } from "./specs/pairFor.spec";
 import { shouldBehaveLikeRouterScenarios } from "./specs/RouterScenarios.spec";
 import { shouldBehaveLikeMintCallback } from "./specs/mintCallback.spec";
 import { shouldBehaveLikeAddLiquidity } from "./specs/addLiquidity.spec";
+import { shouldBehaveLikeAddLiquidityV1 } from "./specs/addLiquidityV1.spec";
 import { shouldBehaveLikeAddLiquidityETH } from "./specs/addLiquidityETH.spec";
 import { shouldBehaveLikeRemoveLiquidity } from "./specs/removeLiquidity.spec";
 import { shouldBehaveLikeRemoveLiquidityETH } from "./specs/removeLiquidityETH.spec";
@@ -28,6 +30,7 @@ import { shouldBehaveLikeUnwrapWETH } from "./specs/unwrapWETH.spec";
 import { shouldBehaveLikeCheckFailedTest } from "./specs/testnetCheckFailedTest";
 import { shouldRefundUnusedETH } from "./specs/refundEth.spec";
 import { shouldBehaveLikeSmardexRouterGetAmountFromPair } from "./specs/getAmountFromPair.spec";
+import { shouldBehaveLikeWhitelist } from "./specs/whitelist.spec";
 
 export function unitTestsSmardexRouter(): void {
   describe("SmarDexRouter", function () {
@@ -50,6 +53,26 @@ export function unitTestsSmardexRouter(): void {
       });
       describe("SmarDex Router unwrapWETHTest", function () {
         shouldBehaveLikeUnwrapWETH();
+      });
+    });
+
+    describe("Router whitelist", function () {
+      beforeEach(async function () {
+        const { token0, token1, WETH, factoryV1, factory, smardexRouterV2, smardexRouterTest, pair } =
+          await loadFixture(unitFixtureSmardexRouterWhitelist);
+
+        this.contracts.token0 = token0;
+        this.contracts.token1 = token1;
+        this.contracts.WETH = WETH;
+        this.contracts.smardexFactoryV1 = factoryV1;
+        this.contracts.smardexFactory = factory;
+        this.contracts.smardexRouterTest = smardexRouterTest;
+        this.contracts.smardexRouterV2 = smardexRouterV2;
+        this.contracts.smardexPair = pair;
+      });
+
+      describe("Router whitelist", function () {
+        shouldBehaveLikeWhitelist();
       });
     });
 
@@ -104,6 +127,7 @@ export function unitTestsSmardexRouter(): void {
 
       describe("Add Liquidity", function () {
         shouldBehaveLikeAddLiquidity();
+        shouldBehaveLikeAddLiquidityV1();
       });
       describe("Add Liquidity ETH", function () {
         shouldBehaveLikeAddLiquidityETH();
@@ -211,6 +235,9 @@ export function unitTestsSmardexRouter(): void {
       });
       describe("Exploit test case 4", function () {
         testHack4();
+      });
+      describe("Exploit test case 5", function () {
+        testLiqFrontrun();
       });
     });
   });

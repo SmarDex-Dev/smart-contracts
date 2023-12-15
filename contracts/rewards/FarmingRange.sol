@@ -75,15 +75,25 @@ contract FarmingRange is IFarmingRange, Ownable, ReentrancyGuard {
             rewardInfo.length < rewardInfoLimit,
             "FarmingRange::addRewardInfo::reward info length exceeds the limit"
         );
-        require(
-            rewardInfo.length == 0 || rewardInfo[rewardInfo.length - 1].endBlock >= block.number,
-            "FarmingRange::addRewardInfo::reward period ended"
-        );
-        require(
-            rewardInfo.length == 0 || rewardInfo[rewardInfo.length - 1].endBlock < _endBlock,
-            "FarmingRange::addRewardInfo::bad new endblock"
-        );
-        uint256 _startBlock = rewardInfo.length == 0 ? campaign.startBlock : rewardInfo[rewardInfo.length - 1].endBlock;
+
+        // assign last reward block by default
+        uint256 _startBlock = campaignInfo[_campaignID].lastRewardBlock;
+
+        uint256 _currentCampaignEnd = rewardInfo.length == 0
+            ? campaign.startBlock
+            : rewardInfo[rewardInfo.length - 1].endBlock;
+
+        if (_currentCampaignEnd < block.number) {
+            require(_rewardPerBlock == 0, "FarmingRange::addRewardInfo::reward period ended");
+        }
+
+        // assign largest between endblock and lastRewardBlock
+        if (_startBlock < _currentCampaignEnd) {
+            _startBlock = _currentCampaignEnd;
+        }
+
+        require(_currentCampaignEnd < _endBlock, "FarmingRange::addRewardInfo::bad new endblock");
+
         uint256 _blockRange = _endBlock - _startBlock;
         uint256 _totalRewards = _rewardPerBlock * _blockRange;
         campaign.totalRewards = campaign.totalRewards + _totalRewards;
@@ -208,7 +218,7 @@ contract FarmingRange is IFarmingRange, Ownable, ReentrancyGuard {
     }
 
     /// @inheritdoc IFarmingRange
-    function removeLastRewardInfo(uint256 _campaignID) external virtual onlyOwner {
+    function removeLastRewardInfo(uint256 _campaignID) public virtual onlyOwner {
         RewardInfo[] storage rewardInfo = campaignRewardInfo[_campaignID];
         CampaignInfo storage campaign = campaignInfo[_campaignID];
         uint256 _rewardInfoLength = rewardInfo.length;
@@ -232,6 +242,17 @@ contract FarmingRange is IFarmingRange, Ownable, ReentrancyGuard {
         }
         rewardInfo.pop();
         emit RemoveRewardInfo(_campaignID, _rewardInfoLength - 1);
+    }
+
+    /// @inheritdoc IFarmingRange
+    function removeLastRewardInfoMultiple(uint256 _campaignID, uint256 _number) external virtual onlyOwner {
+        require(_number > 0, "FarmingRange::removeLastRewardInfoMultiple::number should be > 0");
+        for (uint256 _i; _i != _number; ) {
+            removeLastRewardInfo(_campaignID);
+            unchecked {
+                ++_i;
+            }
+        }
     }
 
     /// @inheritdoc IFarmingRange
@@ -288,14 +309,15 @@ contract FarmingRange is IFarmingRange, Ownable, ReentrancyGuard {
     }
 
     /// @inheritdoc IFarmingRange
-    function deposit(uint256 _campaignID, uint256 _amount) public nonReentrant {
+    function deposit(uint256 _campaignID, uint256 _amount, address _for) public nonReentrant {
+        require(_for != address(0), "FarmingRange::deposit::bad _for");
         CampaignInfo storage campaign = campaignInfo[_campaignID];
-        UserInfo storage user = userInfo[_campaignID][msg.sender];
+        UserInfo storage user = userInfo[_campaignID][_for];
         _updateCampaign(_campaignID);
         if (user.amount != 0) {
             uint256 _pending = (user.amount * campaign.accRewardPerShare) / 1e20 - user.rewardDebt;
             if (_pending != 0) {
-                campaign.rewardToken.safeTransfer(address(msg.sender), _pending);
+                campaign.rewardToken.safeTransfer(_for, _pending);
             }
         }
         if (_amount != 0) {
@@ -304,7 +326,7 @@ contract FarmingRange is IFarmingRange, Ownable, ReentrancyGuard {
             campaign.stakingToken.safeTransferFrom(msg.sender, address(this), _amount);
         }
         user.rewardDebt = (user.amount * campaign.accRewardPerShare) / (1e20);
-        emit Deposit(msg.sender, _amount, _campaignID);
+        emit Deposit(_for, _amount, _campaignID);
     }
 
     /// @inheritdoc IFarmingRange
@@ -328,18 +350,23 @@ contract FarmingRange is IFarmingRange, Ownable, ReentrancyGuard {
             _s
         );
 
-        deposit(_campaignID, _amount);
+        deposit(_campaignID, _amount, msg.sender);
     }
 
     /// @inheritdoc IFarmingRange
-    function withdraw(uint256 _campaignID, uint256 _amount) external nonReentrant {
-        _withdraw(_campaignID, _amount);
+    function withdraw(
+        uint256 _campaignID,
+        uint256 _amount,
+        address _rewardTo,
+        address _stakingTo
+    ) external nonReentrant {
+        _withdraw(_campaignID, _amount, _rewardTo, _stakingTo);
     }
 
     /// @inheritdoc IFarmingRange
-    function harvest(uint256[] calldata _campaignIDs) external nonReentrant {
+    function harvest(uint256[] calldata _campaignIDs, address _rewardTo) external nonReentrant {
         for (uint256 _i; _i != _campaignIDs.length; ) {
-            _withdraw(_campaignIDs[_i], 0);
+            _withdraw(_campaignIDs[_i], 0, _rewardTo, _rewardTo);
             unchecked {
                 ++_i;
             }
@@ -572,23 +599,27 @@ contract FarmingRange is IFarmingRange, Ownable, ReentrancyGuard {
      * @notice Withdraw staking token in a campaign. Also withdraw the current pending reward
      * @param _campaignID campaign id
      * @param _amount amount to withdraw
+     * @param _rewardTo address to which the reward tokens will be sent
+     * @param _stakingTo address to which the staking tokens will be sent
      */
-    function _withdraw(uint256 _campaignID, uint256 _amount) internal {
+    function _withdraw(uint256 _campaignID, uint256 _amount, address _rewardTo, address _stakingTo) internal {
+        require(_rewardTo != address(0), "FarmingRange::withdraw::bad _rewardTo");
+        require(_stakingTo != address(0), "FarmingRange::withdraw::bad _stakingTo");
         CampaignInfo storage campaign = campaignInfo[_campaignID];
         UserInfo storage user = userInfo[_campaignID][msg.sender];
         require(user.amount >= _amount, "FarmingRange::withdraw::bad withdraw amount");
         _updateCampaign(_campaignID);
         uint256 _pending = (user.amount * campaign.accRewardPerShare) / 1e20 - user.rewardDebt;
         if (_pending != 0) {
-            campaign.rewardToken.safeTransfer(msg.sender, _pending);
+            campaign.rewardToken.safeTransfer(_rewardTo, _pending);
         }
         if (_amount != 0) {
             user.amount = user.amount - _amount;
             campaign.totalStaked = campaign.totalStaked - _amount;
-            campaign.stakingToken.safeTransfer(msg.sender, _amount);
+            campaign.stakingToken.safeTransfer(_stakingTo, _amount);
         }
         user.rewardDebt = (user.amount * campaign.accRewardPerShare) / 1e20;
 
-        emit Withdraw(msg.sender, _amount, _campaignID);
+        emit Withdraw(_rewardTo, _stakingTo, _amount, _campaignID);
     }
 }

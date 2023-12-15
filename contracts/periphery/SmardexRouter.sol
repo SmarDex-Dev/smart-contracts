@@ -26,6 +26,8 @@ contract SmardexRouter is ISmardexRouter {
     address public immutable factory;
     address public immutable WETH;
 
+    mapping(bytes32 => address) whitelist;
+
     /// @dev Used as the placeholder value for amountInCached, because the computed amount in for an exact output swap
     /// can never actually be this value
     uint256 private constant DEFAULT_AMOUNT_IN_CACHED = type(uint256).max;
@@ -38,9 +40,33 @@ contract SmardexRouter is ISmardexRouter {
         _;
     }
 
+    /**
+     * @param _factory address of the factory used to get pair address
+     * @param _WETH address of the WETH token
+     */
     constructor(address _factory, address _WETH) {
         factory = _factory;
         WETH = _WETH;
+    }
+
+    /// @inheritdoc ISmardexRouter
+    function addPairToWhitelist(address _tokenA, address _tokenB) external virtual override returns (address pair_) {
+        // gas savings
+        address _factory = factory;
+
+        // calculate the pair address if created by the current factory
+        bytes32 _tokenHash = PoolAddress.getTokenHash(_factory, _tokenA, _tokenB);
+        // get the effective pair address
+        pair_ = ISmardexFactory(_factory).getPair(_tokenA, _tokenB);
+        // check that the pair exists in the factory
+        require(pair_ != address(0), "SmardexRouter: PAIR_MISSING");
+        // check that the pair was added to the whitelist and is not a new pair
+        require(address(uint160(uint256(_tokenHash))) != pair_, "SmardexRouter: NOT_WHITELISTABLE");
+
+        // use the pair from the factory, to ensure the same pair is used for the same tokens
+        whitelist[_tokenHash] = pair_;
+
+        emit PairWhitelisted(_tokenA, _tokenB, pair_);
     }
 
     receive() external payable {
@@ -55,21 +81,24 @@ contract SmardexRouter is ISmardexRouter {
         (address _tokenIn, address _tokenOut) = _decodedData.path.decodeFirstPool();
 
         // ensure that msg.sender is a pair
-        require(msg.sender == PoolAddress.pairFor(factory, _tokenIn, _tokenOut), "SmarDexRouter: INVALID_PAIR");
+        require(
+            msg.sender == PoolAddress.pairFor(factory, _tokenIn, _tokenOut, whitelist),
+            "SmarDexRouter: INVALID_PAIR"
+        );
 
         (bool _isExactInput, uint256 _amountToPay) = _amount0Delta > 0
             ? (_tokenIn < _tokenOut, uint256(_amount0Delta))
             : (_tokenOut < _tokenIn, uint256(_amount1Delta));
 
         if (_isExactInput) {
-            pay(_tokenIn, _decodedData.payer, msg.sender, _amountToPay);
+            _pay(_tokenIn, _decodedData.payer, msg.sender, _amountToPay);
         } else if (_decodedData.path.hasMultiplePools()) {
             _decodedData.path = _decodedData.path.skipToken();
             _swapExactOut(_amountToPay, msg.sender, _decodedData);
         } else {
             amountInCached = _amountToPay;
             _tokenIn = _tokenOut; // swap in/out because exact output swaps are reversed
-            pay(_tokenIn, _decodedData.payer, msg.sender, _amountToPay);
+            _pay(_tokenIn, _decodedData.payer, msg.sender, _amountToPay);
         }
     }
 
@@ -83,7 +112,7 @@ contract SmardexRouter is ISmardexRouter {
      * @custom:from UniV3 PeripheryPayments.sol
      * @custom:url https://github.com/Uniswap/v3-periphery/blob/v1.3.0/contracts/base/PeripheryPayments.sol
      */
-    function pay(address _token, address _payer, address _to, uint256 _value) internal {
+    function _pay(address _token, address _payer, address _to, uint256 _value) internal {
         if (_token == WETH && address(this).balance >= _value) {
             // pay with WETH
             IWETH(WETH).deposit{ value: _value }(); // wrap only what is needed to pay
@@ -101,34 +130,25 @@ contract SmardexRouter is ISmardexRouter {
     ///@inheritdoc ISmardexMintCallback
     function smardexMintCallback(MintCallbackData calldata _data) external override {
         // ensure that msg.sender is a pair
-        require(msg.sender == PoolAddress.pairFor(factory, _data.token0, _data.token1), "SmarDexRouter: INVALID_PAIR");
+        require(
+            msg.sender == PoolAddress.pairFor(factory, _data.token0, _data.token1, whitelist),
+            "SmarDexRouter: INVALID_PAIR"
+        );
         require(_data.amount0 != 0 || _data.amount1 != 0, "SmardexRouter: Callback Invalid amount");
 
-        pay(_data.token0, _data.payer, msg.sender, _data.amount0);
-        pay(_data.token1, _data.payer, msg.sender, _data.amount1);
+        _pay(_data.token0, _data.payer, msg.sender, _data.amount0);
+        _pay(_data.token1, _data.payer, msg.sender, _data.amount1);
     }
 
     /// @inheritdoc ISmardexRouter
     function addLiquidity(
-        address _tokenA,
-        address _tokenB,
-        uint256 _amountADesired,
-        uint256 _amountBDesired,
-        uint256 _amountAMin,
-        uint256 _amountBMin,
+        AddLiquidityParams calldata _params,
         address _to,
         uint256 _deadline
     ) external virtual override ensure(_deadline) returns (uint256 amountA_, uint256 amountB_, uint256 liquidity_) {
-        (amountA_, amountB_) = _addLiquidity(
-            _tokenA,
-            _tokenB,
-            _amountADesired,
-            _amountBDesired,
-            _amountAMin,
-            _amountBMin
-        );
-        address _pair = PoolAddress.pairFor(factory, _tokenA, _tokenB);
-        bool _orderedPair = _tokenA < _tokenB;
+        address _pair;
+        (amountA_, amountB_, _pair) = _addLiquidity(_params);
+        bool _orderedPair = _params.tokenA < _params.tokenB;
         liquidity_ = ISmardexPair(_pair).mint(
             _to,
             _orderedPair ? amountA_ : amountB_,
@@ -139,10 +159,7 @@ contract SmardexRouter is ISmardexRouter {
 
     /// @inheritdoc ISmardexRouter
     function addLiquidityETH(
-        address _token,
-        uint256 _amountTokenDesired,
-        uint256 _amountTokenMin,
-        uint256 _amountETHMin,
+        AddLiquidityETHParams calldata _params,
         address _to,
         uint256 _deadline
     )
@@ -153,18 +170,21 @@ contract SmardexRouter is ISmardexRouter {
         ensure(_deadline)
         returns (uint256 amountToken_, uint256 amountETH_, uint256 liquidity_)
     {
-        (amountToken_, amountETH_) = _addLiquidity(
-            _token,
-            WETH,
-            _amountTokenDesired,
-            msg.value,
-            _amountTokenMin,
-            _amountETHMin
-        );
+        AddLiquidityParams memory _p = AddLiquidityParams({
+            tokenA: _params.token,
+            tokenB: WETH,
+            amountADesired: _params.amountTokenDesired,
+            amountBDesired: msg.value,
+            amountAMin: _params.amountTokenMin,
+            amountBMin: _params.amountETHMin,
+            fictiveReserveB: _params.fictiveReserveETH,
+            fictiveReserveAMin: _params.fictiveReserveTokenMin,
+            fictiveReserveAMax: _params.fictiveReserveTokenMax
+        });
+        address _pair;
+        (amountToken_, amountETH_, _pair) = _addLiquidity(_p);
 
-        address _pair = PoolAddress.pairFor(factory, _token, WETH);
-        bool _orderedPair = _token < WETH;
-
+        bool _orderedPair = _params.token < WETH;
         liquidity_ = ISmardexPair(_pair).mint(
             _to,
             _orderedPair ? amountToken_ : amountETH_,
@@ -188,7 +208,7 @@ contract SmardexRouter is ISmardexRouter {
         address _to,
         uint256 _deadline
     ) public virtual override ensure(_deadline) returns (uint256 amountA_, uint256 amountB_) {
-        address _pair = PoolAddress.pairFor(factory, _tokenA, _tokenB);
+        address _pair = PoolAddress.pairFor(factory, _tokenA, _tokenB, whitelist);
         ISmardexPair(_pair).transferFrom(msg.sender, _pair, _liquidity); // send liquidity to pair
 
         (uint256 _amount0, uint256 _amount1) = ISmardexPair(_pair).burn(_to);
@@ -236,9 +256,12 @@ contract SmardexRouter is ISmardexRouter {
         bytes32 _r,
         bytes32 _s
     ) external virtual override returns (uint256 amountA_, uint256 amountB_) {
-        address _pair = PoolAddress.pairFor(factory, _tokenA, _tokenB);
+        address _pair = PoolAddress.pairFor(factory, _tokenA, _tokenB, whitelist);
         uint256 _value = _approveMax ? type(uint256).max : _liquidity;
-        ISmardexPair(_pair).permit(msg.sender, address(this), _value, _deadline, _v, _r, _s);
+        // Check and execute permit. In case of failure, we don't want to revert because it's a vector for griefing.
+        // transferFrom call will revert in case allowance is not sufficient.
+        try ISmardexPair(_pair).permit(msg.sender, address(this), _value, _deadline, _v, _r, _s) {} catch {}
+
         (amountA_, amountB_) = removeLiquidity(_tokenA, _tokenB, _liquidity, _amountAMin, _amountBMin, _to, _deadline);
     }
 
@@ -255,9 +278,11 @@ contract SmardexRouter is ISmardexRouter {
         bytes32 _r,
         bytes32 _s
     ) external virtual override returns (uint256 amountToken_, uint256 amountETH_) {
-        address _pair = PoolAddress.pairFor(factory, _token, WETH);
+        address _pair = PoolAddress.pairFor(factory, _token, WETH, whitelist);
         uint256 _value = _approveMax ? type(uint256).max : _liquidity;
-        ISmardexPair(_pair).permit(msg.sender, address(this), _value, _deadline, _v, _r, _s);
+        // Check and execute permit. In case of failure, we don't want to revert because it's a vector for griefing.
+        // transferFrom call will revert in case allowance is not sufficient.
+        try ISmardexPair(_pair).permit(msg.sender, address(this), _value, _deadline, _v, _r, _s) {} catch {}
         (amountToken_, amountETH_) = removeLiquidityETH(
             _token,
             _liquidity,
@@ -305,6 +330,26 @@ contract SmardexRouter is ISmardexRouter {
     }
 
     /// @inheritdoc ISmardexRouter
+    function swapExactTokensForTokensWithPermit(
+        uint256 _amountIn,
+        uint256 _amountOutMin,
+        address[] calldata _path,
+        address _to,
+        uint256 _deadline,
+        bool _approveMax,
+        uint8 _v,
+        bytes32 _r,
+        bytes32 _s
+    ) external virtual override returns (uint256 amountOut_) {
+        uint256 _value = _approveMax ? type(uint256).max : _amountIn;
+        // Check and execute permit. In case of failure, we don't want to revert because it's a vector for griefing.
+        // transferFrom call will revert in case allowance is not sufficient.
+        try IERC20Permit(_path[0]).permit(msg.sender, address(this), _value, _deadline, _v, _r, _s) {} catch {}
+
+        return swapExactTokensForTokens(_amountIn, _amountOutMin, _path, _to, _deadline);
+    }
+
+    /// @inheritdoc ISmardexRouter
     function swapTokensForExactTokens(
         uint256 _amountOut,
         uint256 _amountInMax,
@@ -322,16 +367,56 @@ contract SmardexRouter is ISmardexRouter {
     }
 
     /// @inheritdoc ISmardexRouter
+    function swapTokensForExactTokensWithPermit(
+        uint256 _amountOut,
+        uint256 _amountInMax,
+        address[] calldata _path,
+        address _to,
+        uint256 _deadline,
+        bool _approveMax,
+        uint8 _v,
+        bytes32 _r,
+        bytes32 _s
+    ) external virtual override returns (uint256 amountIn_) {
+        uint256 _value = _approveMax ? type(uint256).max : _amountInMax;
+        // Check and execute permit. In case of failure, we don't want to revert because it's a vector for griefing.
+        // transferFrom call will revert in case allowance is not sufficient.
+        try IERC20Permit(_path[0]).permit(msg.sender, address(this), _value, _deadline, _v, _r, _s) {} catch {}
+
+        return swapTokensForExactTokens(_amountOut, _amountInMax, _path, _to, _deadline);
+    }
+
+    /// @inheritdoc ISmardexRouter
     function swapTokensForExactETH(
         uint256 _amountOut,
         uint256 _amountInMax,
         address[] calldata _path,
         address _to,
         uint256 _deadline
-    ) external virtual override ensure(_deadline) returns (uint256 amountIn_) {
+    ) public virtual override ensure(_deadline) returns (uint256 amountIn_) {
         require(_path[_path.length - 1] == WETH, "SmarDexRouter: INVALID_PATH");
         amountIn_ = swapTokensForExactTokens(_amountOut, _amountInMax, _path, address(this), _deadline);
         _unwrapWETH(_amountOut, _to);
+    }
+
+    /// @inheritdoc ISmardexRouter
+    function swapTokensForExactETHWithPermit(
+        uint256 _amountOut,
+        uint256 _amountInMax,
+        address[] calldata _path,
+        address _to,
+        uint256 _deadline,
+        bool _approveMax,
+        uint8 _v,
+        bytes32 _r,
+        bytes32 _s
+    ) external virtual override returns (uint256 amountIn_) {
+        uint256 _value = _approveMax ? type(uint256).max : _amountInMax;
+        // Check and execute permit. In case of failure, we don't want to revert because it's a vector for griefing.
+        // transferFrom call will revert in case allowance is not sufficient.
+        try IERC20Permit(_path[0]).permit(msg.sender, address(this), _value, _deadline, _v, _r, _s) {} catch {}
+
+        return swapTokensForExactETH(_amountOut, _amountInMax, _path, _to, _deadline);
     }
 
     /// @inheritdoc ISmardexRouter
@@ -366,10 +451,30 @@ contract SmardexRouter is ISmardexRouter {
         address[] calldata _path,
         address _to,
         uint256 _deadline
-    ) external virtual override ensure(_deadline) returns (uint256 amountOut_) {
+    ) public virtual override ensure(_deadline) returns (uint256 amountOut_) {
         require(_path[_path.length - 1] == WETH, "SmarDexRouter: INVALID_PATH");
         amountOut_ = swapExactTokensForTokens(_amountIn, _amountOutMin, _path, address(this), _deadline);
         _unwrapWETH(amountOut_, _to);
+    }
+
+    /// @inheritdoc ISmardexRouter
+    function swapExactTokensForETHWithPermit(
+        uint256 _amountIn,
+        uint256 _amountOutMin,
+        address[] calldata _path,
+        address _to,
+        uint256 _deadline,
+        bool _approveMax,
+        uint8 _v,
+        bytes32 _r,
+        bytes32 _s
+    ) external virtual override returns (uint256 amountOut_) {
+        uint256 _value = _approveMax ? type(uint256).max : _amountIn;
+        // Check and execute permit. In case of failure, we don't want to revert because it's a vector for griefing.
+        // transferFrom call will revert in case allowance is not sufficient.
+        try IERC20Permit(_path[0]).permit(msg.sender, address(this), _value, _deadline, _v, _r, _s) {} catch {}
+
+        return swapExactTokensForETH(_amountIn, _amountOutMin, _path, _to, _deadline);
     }
 
     /**
@@ -420,57 +525,57 @@ contract SmardexRouter is ISmardexRouter {
         (address _tokenOut, address _tokenIn) = _data.path.decodeFirstPool();
         bool _zeroForOne = _tokenIn < _tokenOut;
 
-        // do the swap
-        (int256 _amount0, int256 _amount1) = ISmardexPair(PoolAddress.pairFor(factory, _tokenIn, _tokenOut)).swap(
-            _to,
-            _zeroForOne,
-            -_amountOut.toInt256(),
-            abi.encode(_data)
-        );
+        (int256 _amount0, int256 _amount1) = ISmardexPair(PoolAddress.pairFor(factory, _tokenOut, _tokenIn, whitelist))
+            .swap(_to, _zeroForOne, -_amountOut.toInt256(), abi.encode(_data));
 
         amountIn_ = _zeroForOne ? uint256(_amount0) : uint256(_amount1);
     }
 
     /**
      * @notice Add liquidity to an ERC-20=ERC-20 pool. Receive liquidity token to materialize shares in the pool
-     * @param _tokenA address of the first token in the pair
-     * @param _tokenB address of the second token in the pair
-     * @param _amountADesired The amount of tokenA to add as liquidity
-     * if the B/A price is <= amountBDesired/amountADesired
-     * @param _amountBDesired The amount of tokenB to add as liquidity
-     * if the A/B price is <= amountADesired/amountBDesired
-     * @param _amountAMin Bounds the extent to which the B/A price can go up before the transaction reverts.
-     * Must be <= amountADesired.
-     * @param _amountBMin Bounds the extent to which the A/B price can go up before the transaction reverts.
-     * Must be <= amountBDesired.
+     * @param _params parameters of the liquidity to add
      * @return amountA_ The amount of tokenA sent to the pool.
      * @return amountB_ The amount of tokenB sent to the pool.
+     * @return pair_ The address of the pool where the liquidity was added.
      */
     function _addLiquidity(
-        address _tokenA,
-        address _tokenB,
-        uint256 _amountADesired,
-        uint256 _amountBDesired,
-        uint256 _amountAMin,
-        uint256 _amountBMin
-    ) internal virtual returns (uint256 amountA_, uint256 amountB_) {
+        AddLiquidityParams memory _params
+    ) internal virtual returns (uint256 amountA_, uint256 amountB_, address pair_) {
         // create the pair if it doesn't exist yet
-        if (ISmardexFactory(factory).getPair(_tokenA, _tokenB) == address(0)) {
-            ISmardexFactory(factory).createPair(_tokenA, _tokenB);
+        pair_ = ISmardexFactory(factory).getPair(_params.tokenA, _params.tokenB);
+        if (pair_ == address(0)) {
+            pair_ = ISmardexFactory(factory).createPair(_params.tokenA, _params.tokenB);
         }
-        (uint256 _reserveA, uint256 _reserveB) = PoolHelpers.getReserves(factory, _tokenA, _tokenB);
+        if (ISmardexPair(pair_).totalSupply() == 0) {
+            ISmardexPair(pair_).skim(msg.sender); // in case some tokens are already on the pair
+        }
+        (uint256 _reserveA, uint256 _reserveB, uint256 _reserveAFic, uint256 _reserveBFic) = PoolHelpers.getAllReserves(
+            factory,
+            _params.tokenA,
+            _params.tokenB,
+            whitelist
+        );
         if (_reserveA == 0 && _reserveB == 0) {
-            (amountA_, amountB_) = (_amountADesired, _amountBDesired);
+            (amountA_, amountB_) = (_params.amountADesired, _params.amountBDesired);
         } else {
-            uint256 _amountBOptimal = PoolHelpers.quote(_amountADesired, _reserveA, _reserveB);
-            if (_amountBOptimal <= _amountBDesired) {
-                require(_amountBOptimal >= _amountBMin, "SmarDexRouter: INSUFFICIENT_B_AMOUNT");
-                (amountA_, amountB_) = (_amountADesired, _amountBOptimal);
+            // price slippage check
+            // the current price is _reserveAFic / _reserveBFic
+            // the max price that the user accepts is _params.fictiveReserveAMax / _params.fictiveReserveB
+            // the min price that the user accepts is _params.fictiveReserveAMin / _params.fictiveReserveB
+            uint256 _product = _reserveAFic * _params.fictiveReserveB;
+            require(_product <= _params.fictiveReserveAMax * _reserveBFic, "SmarDexRouter: PRICE_TOO_HIGH");
+            require(_product >= _params.fictiveReserveAMin * _reserveBFic, "SmarDexRouter: PRICE_TOO_LOW");
+
+            // real reserves slippage check
+            uint256 _amountBOptimal = PoolHelpers.quote(_params.amountADesired, _reserveA, _reserveB);
+            if (_amountBOptimal <= _params.amountBDesired) {
+                require(_amountBOptimal >= _params.amountBMin, "SmarDexRouter: INSUFFICIENT_B_AMOUNT");
+                (amountA_, amountB_) = (_params.amountADesired, _amountBOptimal);
             } else {
-                uint256 _amountAOptimal = PoolHelpers.quote(_amountBDesired, _reserveB, _reserveA);
-                assert(_amountAOptimal <= _amountADesired);
-                require(_amountAOptimal >= _amountAMin, "SmarDexRouter: INSUFFICIENT_A_AMOUNT");
-                (amountA_, amountB_) = (_amountAOptimal, _amountBDesired);
+                uint256 _amountAOptimal = PoolHelpers.quote(_params.amountBDesired, _reserveB, _reserveA);
+                assert(_amountAOptimal <= _params.amountADesired);
+                require(_amountAOptimal >= _params.amountAMin, "SmarDexRouter: INSUFFICIENT_A_AMOUNT");
+                (amountA_, amountB_) = (_amountAOptimal, _params.amountBDesired);
             }
         }
     }
@@ -494,12 +599,8 @@ contract SmardexRouter is ISmardexRouter {
 
         (address _tokenIn, address _tokenOut) = _data.path.decodeFirstPool();
         bool _zeroForOne = _tokenIn < _tokenOut;
-        (int256 _amount0, int256 _amount1) = ISmardexPair(PoolAddress.pairFor(factory, _tokenIn, _tokenOut)).swap(
-            _to,
-            _zeroForOne,
-            _amountIn.toInt256(),
-            abi.encode(_data)
-        );
+        (int256 _amount0, int256 _amount1) = ISmardexPair(PoolAddress.pairFor(factory, _tokenIn, _tokenOut, whitelist))
+            .swap(_to, _zeroForOne, _amountIn.toInt256(), abi.encode(_data));
 
         amountOut_ = (_zeroForOne ? -_amount1 : -_amount0).toUint256();
     }

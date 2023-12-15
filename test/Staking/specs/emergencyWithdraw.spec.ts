@@ -117,7 +117,7 @@ export function shouldBehaveLikeEmergencyWithdraw(): void {
     expect(await sdex.balanceOf(admin.address)).to.be.eq(SMARDEX_ADMIN_BALANCE.sub(parseEther("1")).sub(2));
 
     const sharesAdmin = (await staking.userInfo(admin.address)).shares;
-    let totalShares = await staking.totalShares();
+    const totalShares = await staking.totalShares();
     expect(sharesAdmin).to.be.eq(parseShare(BigNumber.from(2)).sub(MINIMUM_SHARES));
     expect(totalShares).to.be.eq(parseShare(BigNumber.from(3)));
 

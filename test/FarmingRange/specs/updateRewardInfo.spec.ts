@@ -178,7 +178,7 @@ export function shouldBehaveLikeUpdateRewardInfo() {
             await this.farming.stakingTokenAsDeployer.mint(this.signers.user.address, parseEther("100"));
             await this.farming.stakingTokenAsAlice.approve(this.farming.farmingRange.address, parseEther("100"));
 
-            await this.farming.farmingRangeAsAlice.deposit(0, parseEther("100"));
+            await this.farming.farmingRangeAsAlice.deposit(0, parseEther("100"), this.signers.user.address);
             await this.farming.farmingRangeAsAlice.updateCampaign(0);
 
             //check totalReward
@@ -201,7 +201,12 @@ export function shouldBehaveLikeUpdateRewardInfo() {
             const updateRewardInfoNext = await this.farming.farmingRangeAsDeployer.campaignRewardInfo(0, 1);
             expect(updateRewardInfoNext.rewardPerBlock).to.eq(INITIAL_BONUS_REWARD_PER_BLOCK.mul(10).div(9));
             await advanceBlockTo(this.farming.mockedBlock.add(30).toNumber());
-            await this.farming.farmingRangeAsAlice.withdraw(0, parseEther("100"));
+            await this.farming.farmingRangeAsAlice.withdraw(
+              0,
+              parseEther("100"),
+              this.signers.user.address,
+              this.signers.user.address,
+            );
 
             const balanceAfter = await this.farming.rewardToken.balanceOf(this.farming.farmingRange.address);
             expect(balanceAfter).to.eq(0);
@@ -242,7 +247,7 @@ export function shouldBehaveLikeUpdateRewardInfo() {
             await this.farming.stakingTokenAsDeployer.mint(this.signers.user.address, parseEther("100"));
             await this.farming.stakingTokenAsAlice.approve(this.farming.farmingRange.address, parseEther("100"));
 
-            await this.farming.farmingRangeAsAlice.deposit(0, parseEther("100"));
+            await this.farming.farmingRangeAsAlice.deposit(0, parseEther("100"), this.signers.user.address);
             await this.farming.farmingRangeAsAlice.updateCampaign(0);
 
             //check totalReward
@@ -265,7 +270,12 @@ export function shouldBehaveLikeUpdateRewardInfo() {
             const updateRewardInfoNext = await this.farming.farmingRangeAsDeployer.campaignRewardInfo(0, 1);
             expect(updateRewardInfoNext.rewardPerBlock).to.eq(INITIAL_BONUS_REWARD_PER_BLOCK.mul(10).div(11));
             await advanceBlockTo(this.farming.mockedBlock.add(28).add(6).add(10).toNumber());
-            await this.farming.farmingRangeAsAlice.withdraw(0, parseEther("100"));
+            await this.farming.farmingRangeAsAlice.withdraw(
+              0,
+              parseEther("100"),
+              this.signers.user.address,
+              this.signers.user.address,
+            );
             expect(await this.farming.rewardToken.balanceOf(this.signers.user.address)).to.eq(
               INITIAL_BONUS_REWARD_PER_BLOCK.mul(9).add(INITIAL_BONUS_REWARD_PER_BLOCK.mul(10).div(11).mul(11)), //careful we need to / 11 * 11 to round down !
             );
@@ -299,7 +309,7 @@ export function shouldBehaveLikeUpdateRewardInfo() {
 
           // alice deposit @block number #(mockedBlock+7)
 
-          await this.farming.farmingRangeAsAlice.deposit(0, parseEther("100"));
+          await this.farming.farmingRangeAsAlice.deposit(0, parseEther("100"), this.signers.user.address);
           // alice call update campaign @block number #(mockedBlock+8)
           await this.farming.farmingRangeAsAlice.updateCampaign(0);
           let actualBlock = await latestBlockNumber();
@@ -343,7 +353,14 @@ export function shouldBehaveLikeUpdateRewardInfo() {
           latestRewardBlock = actualBlock.gt(this.farming.mockedBlock.add(20))
             ? this.farming.mockedBlock.add(20)
             : actualBlock;
-          await expect(this.farming.farmingRangeAsAlice.withdraw(0, parseEther("100"))).to.not.be.reverted;
+          await expect(
+            this.farming.farmingRangeAsAlice.withdraw(
+              0,
+              parseEther("100"),
+              this.signers.user.address,
+              this.signers.user.address,
+            ),
+          ).to.not.be.reverted;
           expect(await this.farming.rewardToken.balanceOf(this.signers.user.address)).to.eq(
             INITIAL_BONUS_REWARD_PER_BLOCK.mul(updateBlock.sub(startBlock.add(3))).add(
               // Alice deposited @block number #(startBlock+3)

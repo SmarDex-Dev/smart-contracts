@@ -55,7 +55,7 @@ contract Staking is IStaking, ERC20 {
         require(farmingInitialized == false, "Staking::initializeFarming::Farming campaign already initialized");
         _approve(address(this), address(farming), 1 wei);
         _mint(address(this), 1 wei);
-        farming.deposit(CAMPAIGN_ID, 1 wei);
+        farming.deposit(CAMPAIGN_ID, 1 wei, address(this));
 
         farmingInitialized = true;
     }
@@ -143,7 +143,7 @@ contract Staking is IStaking, ERC20 {
 
     /// @inheritdoc IStaking
     function harvestFarming() public {
-        farming.withdraw(CAMPAIGN_ID, 0);
+        farming.withdraw(CAMPAIGN_ID, 0, address(this), address(this));
     }
 
     /// @inheritdoc IStaking

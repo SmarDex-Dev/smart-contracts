@@ -1,7 +1,8 @@
 import { DeployFunction } from "hardhat-deploy/types";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
-import { sendEtherTo } from "./utils";
+import { sendEtherTo, abiPaths } from "./utils";
 import { parseEther } from "ethers/lib/utils";
+import { isV1Pair } from "./params";
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployments, getNamedAccounts } = hre;
@@ -16,9 +17,6 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     if (network === "localhost" && admin !== "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266") {
       await sendEtherTo(parseEther("1"), admin, hre.ethers.provider);
     }
-
-    // comment this line when done in 004_reward_manager.ts
-    throw "do not forget to specify the staking farming blockStart !";
   }
 
   await deploy("SmardexFactory", {
@@ -27,11 +25,12 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     log: true,
   });
 
-  const smardexPairFactory = await hre.ethers.getContractFactory("SmardexPair");
+  // pair artifact
+  const pairArtifact = isV1Pair ? "SmardexPairV1" : "SmardexPair";
 
-  await save("SmardexPair", {
+  await save(pairArtifact, {
     address: hre.ethers.constants.AddressZero,
-    abi: JSON.parse(smardexPairFactory.interface.format("json") as string),
+    abi: (await import(abiPaths[pairArtifact as keyof typeof abiPaths])).abi,
   });
 };
 

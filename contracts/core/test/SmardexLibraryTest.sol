@@ -5,8 +5,8 @@ pragma solidity =0.8.17;
 import "../libraries/SmardexLibrary.sol";
 
 contract SmardexLibraryTest {
-    function approxEq(uint256 x, uint256 y) internal pure returns (bool) {
-        return SmardexLibrary.approxEq(x, y);
+    function approxEq(uint256 _x, uint256 _y) external pure returns (bool) {
+        return SmardexLibrary.approxEq(_x, _y);
     }
 
     function ratioApproxEq(uint256 _xNum, uint256 _xDen, uint256 _yNum, uint256 _yDen) external pure returns (bool) {

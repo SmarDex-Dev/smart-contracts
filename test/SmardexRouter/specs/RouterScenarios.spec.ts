@@ -40,12 +40,17 @@ export function shouldBehaveLikeRouterScenarios() {
     await this.contracts.token0.approve(this.contracts.smardexRouter.address, constants.MaxUint256);
     await this.contracts.token1.approve(this.contracts.smardexRouter.address, constants.MaxUint256);
     await this.contracts.smardexRouter.addLiquidity(
-      this.contracts.token0.address,
-      this.contracts.token1.address,
-      TOKEN0_AMOUNT,
-      TOKEN1_AMOUNT,
-      0,
-      0,
+      {
+        tokenA: this.contracts.token0.address,
+        tokenB: this.contracts.token1.address,
+        amountADesired: TOKEN0_AMOUNT,
+        amountBDesired: TOKEN1_AMOUNT,
+        amountAMin: 0,
+        amountBMin: 0,
+        fictiveReserveB: 0,
+        fictiveReserveAMin: 0,
+        fictiveReserveAMax: 0,
+      },
       this.signers.admin.address,
       constants.MaxUint256,
     );
@@ -57,15 +62,18 @@ export function shouldBehaveLikeRouterScenarios() {
 
     await this.contracts.token0.approve(this.contracts.smardexRouter.address, constants.MaxUint256);
     await this.contracts.smardexRouter.addLiquidityETH(
-      this.contracts.token0.address,
-      token0Amount,
-      0,
-      0,
+      {
+        token: this.contracts.token0.address,
+        amountTokenDesired: token0Amount,
+        amountTokenMin: 0,
+        amountETHMin: 0,
+        fictiveReserveETH: 0,
+        fictiveReserveTokenMin: 0,
+        fictiveReserveTokenMax: 0,
+      },
       this.signers.admin.address,
       constants.MaxUint256,
-      {
-        value: token1Amount,
-      },
+      { value: token1Amount },
     );
     const pair = await this.contracts.smardexFactory.getPair(
       this.contracts.token0.address,
@@ -78,23 +86,33 @@ export function shouldBehaveLikeRouterScenarios() {
 
   it("addLiquidity and should swap Exact In", async function () {
     await this.contracts.smardexRouter.addLiquidity(
-      this.contracts.token0.address,
-      this.contracts.token1.address,
-      TOKEN0_AMOUNT,
-      TOKEN1_AMOUNT,
-      0,
-      0,
+      {
+        tokenA: this.contracts.token0.address,
+        tokenB: this.contracts.token1.address,
+        amountADesired: TOKEN0_AMOUNT,
+        amountBDesired: TOKEN1_AMOUNT,
+        amountAMin: 0,
+        amountBMin: 0,
+        fictiveReserveB: 0,
+        fictiveReserveAMin: 0,
+        fictiveReserveAMax: 0,
+      },
       this.signers.admin.address,
       constants.MaxUint256,
     );
 
     await this.contracts.smardexRouter.addLiquidity(
-      this.contracts.token1.address,
-      this.contracts.WETHPartner.address,
-      TOKEN0_AMOUNT,
-      TOKEN1_AMOUNT,
-      0,
-      0,
+      {
+        tokenA: this.contracts.token1.address,
+        tokenB: this.contracts.WETHPartner.address,
+        amountADesired: TOKEN0_AMOUNT,
+        amountBDesired: TOKEN1_AMOUNT,
+        amountAMin: 0,
+        amountBMin: 0,
+        fictiveReserveB: 0,
+        fictiveReserveAMin: 0,
+        fictiveReserveAMax: 0,
+      },
       this.signers.admin.address,
       constants.MaxUint256,
     );
@@ -156,12 +174,17 @@ export function shouldBehaveLikeRouterScenarios() {
 
     await expect(
       this.contracts.smardexRouter.addLiquidity(
-        this.contracts.token0.address,
-        this.contracts.token1.address,
-        TOKEN0_AMOUNT,
-        TOKEN1_AMOUNT,
-        1,
-        1, //"33334596064823583783",
+        {
+          tokenA: this.contracts.token0.address,
+          tokenB: this.contracts.token1.address,
+          amountADesired: TOKEN0_AMOUNT,
+          amountBDesired: TOKEN1_AMOUNT,
+          amountAMin: 1,
+          amountBMin: 1, //"33334596064823583783"
+          fictiveReserveB: 0,
+          fictiveReserveAMin: 0,
+          fictiveReserveAMax: 0,
+        },
         this.signers.admin.address,
         constants.MaxUint256,
       ),
@@ -176,12 +199,17 @@ export function shouldBehaveLikeRouterScenarios() {
     );
     await expect(
       this.contracts.smardexRouter.addLiquidity(
-        this.contracts.token0.address,
-        this.contracts.token1.address,
-        TOKEN0_AMOUNT.add(1),
-        amountBOptimal.add(1),
-        1,
-        1,
+        {
+          tokenA: this.contracts.token0.address,
+          tokenB: this.contracts.token1.address,
+          amountADesired: TOKEN0_AMOUNT.add(1),
+          amountBDesired: amountBOptimal.add(1),
+          amountAMin: 1,
+          amountBMin: 1,
+          fictiveReserveB: 0,
+          fictiveReserveAMin: 0,
+          fictiveReserveAMax: 0,
+        },
         this.signers.admin.address,
         constants.MaxUint256,
       ),
@@ -196,24 +224,32 @@ export function shouldBehaveLikeRouterScenarios() {
 
   it("addLiquidity and should swap Exact In to ETH", async function () {
     await this.contracts.smardexRouter.addLiquidityETH(
-      this.contracts.WETHPartner.address,
-      TOKEN1_AMOUNT,
-      0,
-      0,
+      {
+        token: this.contracts.WETHPartner.address,
+        amountTokenDesired: TOKEN1_AMOUNT,
+        amountTokenMin: 0,
+        amountETHMin: 0,
+        fictiveReserveETH: 0,
+        fictiveReserveTokenMin: 0,
+        fictiveReserveTokenMax: 0,
+      },
       this.signers.admin.address,
       constants.MaxUint256,
-      {
-        value: TOKEN0_AMOUNT,
-      },
+      { value: TOKEN0_AMOUNT },
     );
 
     await this.contracts.smardexRouter.addLiquidity(
-      this.contracts.token1.address,
-      this.contracts.WETHPartner.address,
-      TOKEN0_AMOUNT,
-      TOKEN1_AMOUNT,
-      0,
-      0,
+      {
+        tokenA: this.contracts.token1.address,
+        tokenB: this.contracts.WETHPartner.address,
+        amountADesired: TOKEN0_AMOUNT,
+        amountBDesired: TOKEN1_AMOUNT,
+        amountAMin: 0,
+        amountBMin: 0,
+        fictiveReserveB: 0,
+        fictiveReserveAMin: 0,
+        fictiveReserveAMax: 0,
+      },
       this.signers.admin.address,
       constants.MaxUint256,
     );
@@ -296,23 +332,33 @@ export function shouldBehaveLikeRouterScenarios() {
 
   it("addLiquidity and should swap Exact Out", async function () {
     await this.contracts.smardexRouter.addLiquidity(
-      this.contracts.token0.address,
-      this.contracts.token1.address,
-      TOKEN0_AMOUNT,
-      TOKEN1_AMOUNT,
-      0,
-      0,
+      {
+        tokenA: this.contracts.token0.address,
+        tokenB: this.contracts.token1.address,
+        amountADesired: TOKEN0_AMOUNT,
+        amountBDesired: TOKEN1_AMOUNT,
+        amountAMin: 0,
+        amountBMin: 0,
+        fictiveReserveB: 0,
+        fictiveReserveAMin: 0,
+        fictiveReserveAMax: 0,
+      },
       this.signers.admin.address,
       constants.MaxUint256,
     );
 
     await this.contracts.smardexRouter.addLiquidity(
-      this.contracts.token1.address,
-      this.contracts.WETHPartner.address,
-      TOKEN0_AMOUNT,
-      TOKEN1_AMOUNT,
-      0,
-      0,
+      {
+        tokenA: this.contracts.token1.address,
+        tokenB: this.contracts.WETHPartner.address,
+        amountADesired: TOKEN0_AMOUNT,
+        amountBDesired: TOKEN1_AMOUNT,
+        amountAMin: 0,
+        amountBMin: 0,
+        fictiveReserveB: 0,
+        fictiveReserveAMin: 0,
+        fictiveReserveAMax: 0,
+      },
       this.signers.admin.address,
       constants.MaxUint256,
     );
@@ -398,12 +444,17 @@ export function shouldBehaveLikeRouterScenarios() {
 
     await expect(
       this.contracts.smardexRouter.addLiquidity(
-        this.contracts.token0.address,
-        this.contracts.token1.address,
-        TOKEN0_AMOUNT,
-        TOKEN1_AMOUNT,
-        1,
-        1, //"33334596064823583783",
+        {
+          tokenA: this.contracts.token0.address,
+          tokenB: this.contracts.token1.address,
+          amountADesired: TOKEN0_AMOUNT,
+          amountBDesired: TOKEN1_AMOUNT,
+          amountAMin: 1,
+          amountBMin: 1, //"33334596064823583783"
+          fictiveReserveB: 0,
+          fictiveReserveAMin: 0,
+          fictiveReserveAMax: 0,
+        },
         this.signers.admin.address,
         constants.MaxUint256,
       ),
@@ -418,12 +469,17 @@ export function shouldBehaveLikeRouterScenarios() {
     );
     await expect(
       this.contracts.smardexRouter.addLiquidity(
-        this.contracts.token0.address,
-        this.contracts.token1.address,
-        TOKEN0_AMOUNT.add(1),
-        amountBOptimal.add(1),
-        1,
-        1,
+        {
+          tokenA: this.contracts.token0.address,
+          tokenB: this.contracts.token1.address,
+          amountADesired: TOKEN0_AMOUNT.add(1),
+          amountBDesired: amountBOptimal.add(1),
+          amountAMin: 1,
+          amountBMin: 1,
+          fictiveReserveB: 0,
+          fictiveReserveAMin: 0,
+          fictiveReserveAMax: 0,
+        },
         this.signers.admin.address,
         constants.MaxUint256,
       ),
@@ -438,15 +494,18 @@ export function shouldBehaveLikeRouterScenarios() {
 
   it("addLiquidity and should swap Exact In with ETH with function swapExactETHForTokens", async function () {
     await this.contracts.smardexRouter.addLiquidityETH(
-      this.contracts.WETHPartner.address,
-      TOKEN1_AMOUNT,
-      0,
-      0,
+      {
+        token: this.contracts.WETHPartner.address,
+        amountTokenDesired: TOKEN1_AMOUNT,
+        amountTokenMin: 0,
+        amountETHMin: 0,
+        fictiveReserveETH: 0,
+        fictiveReserveTokenMin: 0,
+        fictiveReserveTokenMax: 0,
+      },
       this.signers.admin.address,
       constants.MaxUint256,
-      {
-        value: TOKEN0_AMOUNT,
-      },
+      { value: TOKEN0_AMOUNT },
     );
 
     const balBefore = await getUserBalances(
@@ -481,12 +540,17 @@ export function shouldBehaveLikeRouterScenarios() {
     expect(balAfter.WETHPartner).to.be.gt(balBefore.WETHPartner);
 
     await this.contracts.smardexRouter.addLiquidity(
-      this.contracts.token1.address,
-      this.contracts.WETHPartner.address,
-      TOKEN0_AMOUNT,
-      TOKEN1_AMOUNT,
-      0,
-      0,
+      {
+        tokenA: this.contracts.token1.address,
+        tokenB: this.contracts.WETHPartner.address,
+        amountADesired: TOKEN0_AMOUNT,
+        amountBDesired: TOKEN1_AMOUNT,
+        amountAMin: 0,
+        amountBMin: 0,
+        fictiveReserveB: 0,
+        fictiveReserveAMin: 0,
+        fictiveReserveAMax: 0,
+      },
       this.signers.admin.address,
       constants.MaxUint256,
     );
@@ -514,15 +578,18 @@ export function shouldBehaveLikeRouterScenarios() {
 
   it("addLiquidity and should swap ETH to Exact Out tokens with swapETHForExactTokens", async function () {
     await this.contracts.smardexRouter.addLiquidityETH(
-      this.contracts.WETHPartner.address,
-      TOKEN1_AMOUNT,
-      0,
-      0,
+      {
+        token: this.contracts.WETHPartner.address,
+        amountTokenDesired: TOKEN1_AMOUNT,
+        amountTokenMin: 0,
+        amountETHMin: 0,
+        fictiveReserveETH: 0,
+        fictiveReserveTokenMin: 0,
+        fictiveReserveTokenMax: 0,
+      },
       this.signers.admin.address,
       constants.MaxUint256,
-      {
-        value: TOKEN0_AMOUNT,
-      },
+      { value: TOKEN0_AMOUNT },
     );
 
     const ethPair = await this.contracts.smardexFactory.getPair(
@@ -566,12 +633,17 @@ export function shouldBehaveLikeRouterScenarios() {
     );
 
     await this.contracts.smardexRouter.addLiquidity(
-      this.contracts.token1.address,
-      this.contracts.WETHPartner.address,
-      TOKEN0_AMOUNT,
-      TOKEN1_AMOUNT,
-      0,
-      0,
+      {
+        tokenA: this.contracts.token1.address,
+        tokenB: this.contracts.WETHPartner.address,
+        amountADesired: TOKEN0_AMOUNT,
+        amountBDesired: TOKEN1_AMOUNT,
+        amountAMin: 0,
+        amountBMin: 0,
+        fictiveReserveB: 0,
+        fictiveReserveAMin: 0,
+        fictiveReserveAMax: 0,
+      },
       this.signers.admin.address,
       constants.MaxUint256,
     );
@@ -679,18 +751,21 @@ export function shouldBehaveLikeRouterScenarios() {
       this.contracts.WETH,
     );
 
-    await this.contracts.smardexRouter
-      .connect(this.signers.admin)
-      .addLiquidity(
-        this.contracts.token0.address,
-        this.contracts.token1.address,
-        parseEther("100"),
-        parseEther("100"),
-        0,
-        0,
-        this.signers.admin.address,
-        constants.MaxUint256,
-      );
+    await this.contracts.smardexRouter.connect(this.signers.admin).addLiquidity(
+      {
+        tokenA: this.contracts.token0.address,
+        tokenB: this.contracts.token1.address,
+        amountADesired: parseEther("100"),
+        amountBDesired: parseEther("100"),
+        amountAMin: 0,
+        amountBMin: 0,
+        fictiveReserveB: 0,
+        fictiveReserveAMin: 0,
+        fictiveReserveAMax: 0,
+      },
+      this.signers.admin.address,
+      constants.MaxUint256,
+    );
 
     // we force move price to 100:200 balances by sending free tokens to pair
     // A swap would change price but also change a lot price and that we dont want

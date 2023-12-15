@@ -1,6 +1,6 @@
 # SmarDex Contracts
 
-[![Tests](https://github.com/SmarDex-Dev/smart-contracts/actions/workflows/ci.yml/badge.svg)](https://github.com/SmarDex-Dev/smart-contracts/actions/workflows/ci.yml)
+[![Tests](https://github.com/SmarDex-Dev/smart-contracts/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/petra-foundation/SmarDex-contracts/actions/workflows/ci.yml)
 
 ## Description
 
@@ -98,7 +98,7 @@ Better run with yarn to avoid errors & with config to choose printers_to_run :
 
 ## Contributors
 
-Implemented by [Stéphane Ballmer](https://github.com/sballmer), [Paul-Alexandre Tessier](https://github.com/Paulalex85), [Côme Pecorari](https://github.com/cpecorari), [Léo Fasano](https://github.com/Yashiru) and [Yoan Capron](https://github.com/CapronYoan)
+Implemented by [Stéphane Ballmer](https://github.com/sballmer), [Paul-Alexandre Tessier](https://github.com/Paulalex85), [Côme Pecorari](https://github.com/cpecorari), [Léo Fasano](https://github.com/Yashiru), [Yoan Capron](https://github.com/CapronYoan), [Sami Darnaud](https://github.com/samooyo)
 
 ## Licensing
 

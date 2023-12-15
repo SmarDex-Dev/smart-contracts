@@ -224,4 +224,10 @@ interface ISmardexPair is IERC20, IERC20Permit {
      * @param _feesPool new numerator of fees sent to Pool, could be = 0
      */
     function setFees(uint128 _feesLP, uint128 _feesPool) external;
+
+    /**
+     * @notice withdraw all reserve on the pair in case no liquidity has never been provided
+     * @param _to address who will receive tokens
+     */
+    function skim(address _to) external;
 }

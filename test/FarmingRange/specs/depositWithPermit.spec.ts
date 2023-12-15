@@ -1,4 +1,4 @@
-import { unitFixtureCampaignWith2rewards, UnitFixtureFarmingRange } from "../../fixtures";
+import { unitFixtureCampaignWith2rewards, unitFixtureFarmingRange } from "../../fixtures";
 import { INITIAL_BONUS_REWARD_PER_BLOCK } from "../utils";
 import { expect } from "chai";
 import { parseEther } from "ethers/lib/utils";
@@ -19,7 +19,7 @@ export function shouldBehaveLikeDepositWithPermit() {
       admin: SignerWithAddress,
       alice: SignerWithAddress,
       permitAmount: BigNumber,
-      farming: UnitFixtureFarmingRange,
+      farming: Awaited<ReturnType<typeof unitFixtureFarmingRange>>,
     ) {
       await unitFixtureCampaignWith2rewards(farming, admin, INITIAL_BONUS_REWARD_PER_BLOCK, expect);
       // mint staking token to alice

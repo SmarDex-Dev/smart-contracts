@@ -43,7 +43,9 @@ library SmardexLibrary {
      * @return true if numbers are approximately equal, false otherwise
      */
     function approxEq(uint256 _x, uint256 _y) internal pure returns (bool) {
-        if (_x > _y) {
+        if (_x == _y) {
+            return true;
+        } else if (_x > _y) {
             return _x < (_y + (_y * APPROX_PRECISION) / APPROX_PRECISION_BASE);
         } else {
             return _y < (_x + (_x * APPROX_PRECISION) / APPROX_PRECISION_BASE);

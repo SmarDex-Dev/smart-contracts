@@ -4,10 +4,12 @@ pragma solidity 0.8.17;
 // libraries
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/math/SafeCast.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "../core/libraries/SmardexLibrary.sol";
 import "../periphery/libraries/Path.sol";
 
 // interfaces
+import "../periphery/interfaces/ISmardexRouter.sol";
 import "../core/interfaces/ISmardexPair.sol";
 import "./interfaces/IAutoSwapper.sol";
 
@@ -15,7 +17,7 @@ import "./interfaces/IAutoSwapper.sol";
  * @title AutoSwapper
  * @notice AutoSwapper makes it automatic and/or public to get fees from Smardex and burn it
  */
-contract AutoSwapperL2 is IAutoSwapper {
+contract AutoSwapperL2 is IAutoSwapper, Ownable {
     using SafeERC20 for IERC20;
     using SafeCast for uint256;
     using SafeCast for int256;
@@ -34,12 +36,15 @@ contract AutoSwapperL2 is IAutoSwapper {
     ISmardexPair private constant DEFAULT_CACHED_PAIR = ISmardexPair(address(0));
     ISmardexPair private cachedPair = DEFAULT_CACHED_PAIR;
 
-    constructor(ISmardexFactory _factory, IERC20 _smardexToken) {
+    ISmardexRouter public immutable router;
+
+    constructor(ISmardexFactory _factory, IERC20 _smardexToken, ISmardexRouter _router) {
         require(address(_factory) != address(0), "AutoSwapper: INVALID_FACTORY_ADDRESS");
         require(address(_smardexToken) != address(0), "AutoSwapper: INVALID_SDEX_ADDRESS");
 
         factory = _factory;
         smardexToken = _smardexToken;
+        router = _router;
     }
 
     /// @inheritdoc IAutoSwapper
@@ -49,6 +54,28 @@ contract AutoSwapperL2 is IAutoSwapper {
         uint256 _transferredAmount = transferTokens();
 
         emit workExecuted(_token0, _amount0, _token1, _amount1, _transferredAmount);
+    }
+
+    /// @inheritdoc IAutoSwapper
+    function swapTokenWithPath(
+        uint256 _amountToSwap,
+        uint256 _amountOutMin,
+        address[] calldata _path,
+        uint256 _deadline
+    ) external onlyOwner {
+        require(_path.length > 1, "AutoSwapper: INVALID_PATH");
+        require(_path[_path.length - 1] == address(smardexToken), "AutoSwapper: INVALID_LAST_TOKEN");
+        IERC20 _token = IERC20(_path[0]);
+
+        uint256 _balance = _token.balanceOf(address(this));
+        require(_amountToSwap <= _balance, "AutoSwapper: INVALID_AMOUNT");
+
+        uint256 _amountIn;
+        if (_amountToSwap != 0) _amountIn = _amountToSwap;
+        else _amountIn = _balance;
+        _token.safeApprove(address(router), _amountIn);
+
+        router.swapExactTokensForTokens(_amountIn, _amountOutMin, _path, DEAD_ADR, _deadline);
     }
 
     /// @inheritdoc IAutoSwapper

@@ -519,4 +519,22 @@ contract SmardexPair is ISmardexPair, ERC20Permit {
         // exploitation where a low gasLimit prevents the _feeTo call from fully executing.
         require(gasleft() != 0, "");
     }
+
+    ///@inheritdoc ISmardexPair
+    function skim(address _to) external lock {
+        require(totalSupply() == 0, "SmarDex: ONLY_EMPTY_PAIR");
+
+        // gas savings
+        address _token0 = token0;
+        address _token1 = token1;
+        uint256 _balance0 = IERC20(_token0).balanceOf(address(this));
+        uint256 _balance1 = IERC20(_token1).balanceOf(address(this));
+
+        if (_balance0 != 0) {
+            TransferHelper.safeTransfer(_token0, _to, _balance0);
+        }
+        if (_balance1 != 0) {
+            TransferHelper.safeTransfer(_token1, _to, _balance1);
+        }
+    }
 }

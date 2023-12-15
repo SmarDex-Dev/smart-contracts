@@ -5,8 +5,6 @@ pragma solidity =0.8.17;
 import "../SmardexPair.sol";
 
 contract SmardexPairTest is SmardexPair {
-    constructor() SmardexPair() {}
-
     function setFictivePoolValues(uint128 _fictiveReserve0, uint128 _fictiveReserve1) public {
         (fictiveReserve0, fictiveReserve1) = (_fictiveReserve0, _fictiveReserve1);
     }

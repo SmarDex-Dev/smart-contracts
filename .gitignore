@@ -133,3 +133,7 @@ tmp
 multicalls/
 script/res.txt
 script/*.ps1
+
+# dev shell cache
+.devenv
+.direnv

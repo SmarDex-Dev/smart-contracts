@@ -153,6 +153,6 @@ export function sqrt(a: BigNumber): BigNumber {
 
 export async function latestBlockNumberL2Arbitrum(): Promise<BigNumber> {
   const arbSysCoreFactory = await ethers.getContractFactory("ArbSysCoreTest");
-  const arbSysCoreTest = await arbSysCoreFactory.attach(ADDRESS_100);
+  const arbSysCoreTest = arbSysCoreFactory.attach(ADDRESS_100);
   return await arbSysCoreTest.arbBlockNumber();
 }

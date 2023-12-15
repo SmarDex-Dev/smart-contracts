@@ -55,7 +55,7 @@ contract RouterForPairTest {
     function smardexMintCallback(ISmardexMintCallback.MintCallbackData calldata _data) external {
         require(_data.amount0 > 0 || _data.amount1 > 0, "SmardexRouter: Callback Invalid amount");
         require(
-            msg.sender == PoolAddress.pairForByStorage(factory, _data.token0, _data.token1),
+            msg.sender == ISmardexFactory(factory).getPair(_data.token0, _data.token1),
             "SmarDexRouter: INVALID_PAIR"
         ); // ensure that msg.sender is a pair
         pay(_data.token0, _data.payer, msg.sender, _data.amount0);
@@ -66,10 +66,7 @@ contract RouterForPairTest {
         require(_amount0Delta > 0 || _amount1Delta > 0, "SmardexRouter: Callback Invalid amount");
         SwapCallbackData memory _decodedData = abi.decode(_data, (SwapCallbackData));
         (address _tokenIn, address _tokenOut) = _decodedData.path.decodeFirstPool();
-        require(
-            msg.sender == PoolAddress.pairForByStorage(factory, _tokenIn, _tokenOut),
-            "SmarDexRouter: INVALID_PAIR"
-        ); // ensure that msg.sender is a pair
+        require(msg.sender == ISmardexFactory(factory).getPair(_tokenIn, _tokenOut), "SmarDexRouter: INVALID_PAIR"); // ensure that msg.sender is a pair
         (bool _isExactInput, uint256 _amountToPay) = _amount0Delta > 0
             ? (_tokenIn < _tokenOut, uint256(_amount0Delta))
             : (_tokenOut < _tokenIn, uint256(_amount1Delta));
@@ -129,8 +126,12 @@ contract RouterForPairTest {
         bool _zeroForOne = _tokenIn < _tokenOut;
 
         // do the swap
-        (int256 _amount0, int256 _amount1) = ISmardexPair(PoolAddress.pairForByStorage(factory, _tokenIn, _tokenOut))
-            .swap(_to, _zeroForOne, -_amountOut.toInt256(), abi.encode(_data));
+        (int256 _amount0, int256 _amount1) = ISmardexPair(ISmardexFactory(factory).getPair(_tokenIn, _tokenOut)).swap(
+            _to,
+            _zeroForOne,
+            -_amountOut.toInt256(),
+            abi.encode(_data)
+        );
 
         amountIn_ = _zeroForOne ? uint256(_amount0) : uint256(_amount1);
     }

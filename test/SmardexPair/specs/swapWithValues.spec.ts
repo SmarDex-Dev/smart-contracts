@@ -6,8 +6,9 @@ import { FEES_BASE, FEES_POOL } from "../../constants";
 import { Contracts, Signers } from "../../types";
 import { BigNumber } from "ethers/lib/ethers";
 import { getSwapEncodedData } from "../../utils";
+import { SmardexPairTest, SmardexPairTestV1 } from "../../../typechain";
 
-export function shouldBehaveLikeSwapWithValues(): void {
+export function shouldBehaveLikeSwapWithValues(v1: boolean): void {
   let PATH_ZERO_TO_ONE: string;
   let PATH_ONE_TO_ZERO: string;
 
@@ -58,14 +59,15 @@ export function shouldBehaveLikeSwapWithValues(): void {
     isToken0ToToken1: boolean,
     isFeeToSet: boolean,
   ) {
+    const factory = v1 ? contracts.smardexFactoryV1 : contracts.smardexFactory;
     if (isFeeToSet) {
-      await contracts.smardexFactory.setFeeTo(signers.feeTo.address);
+      await factory.setFeeTo(signers.feeTo.address);
     }
     await setupPair(contracts, signers, getAmountTestCase, isToken0ToToken1);
-
     const balanceTokenInAdminBefore = isToken0ToToken1
       ? await contracts.token0.balanceOf(signers.admin.address)
       : await contracts.token1.balanceOf(signers.admin.address);
+
     await swap(
       contracts,
       signers,
@@ -103,6 +105,7 @@ export function shouldBehaveLikeSwapWithValues(): void {
       isSwapToken0ToToken1 ? getAmountTestCase.fictiveReserveToken0 : getAmountTestCase.fictiveReserveToken1,
       isSwapToken0ToToken1 ? getAmountTestCase.fictiveReserveToken1 : getAmountTestCase.fictiveReserveToken0,
     );
+
     const currentTimestamp = await time.latest();
     await contracts.smardexPairTest.setPriceAverage(
       isSwapToken0ToToken1 ? getAmountTestCase.priceAverageToken0 : getAmountTestCase.priceAverageToken1,
@@ -180,7 +183,12 @@ export function shouldBehaveLikeSwapWithValues(): void {
     isFeeToSet: boolean,
     isSwapToken0ToToken1: boolean,
   ) {
-    const fees = await contracts.smardexPairTest.getFeeToAmounts();
+    let fees;
+    try {
+      fees = await (contracts.smardexPairTest as SmardexPairTest).getFeeToAmounts();
+    } catch {
+      fees = await (contracts.smardexPairTest as SmardexPairTestV1).getFees();
+    }
     const reserves = await contracts.smardexPairTest.getReserves();
     const balancePairToken0 = await contracts.token0.balanceOf(contracts.smardexPairTest.address);
     const balancePairToken1 = await contracts.token1.balanceOf(contracts.smardexPairTest.address);
